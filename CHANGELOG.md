@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.4](https://github.com/philmichel/pinchflat/compare/v1.4.3...v1.4.4) (2026-08-06)
+
+
+### Chores
+
+* nudge workflow registration ([6454d67](https://github.com/philmichel/pinchflat/commit/6454d67d851d64c574845ee6402679bfa621b991))
+
+
+### Documentation
+
+* preserve upstream rollback script for migrating back to original pinchflat ([00836aa](https://github.com/philmichel/pinchflat/commit/00836aa8a2b3ea15a6e0c267d55a5a8f3179331f))
+
 ## [1.4.3](https://github.com/CommunityMaintained/pinchflat/compare/v1.4.2...v1.4.3) (2026-08-02)
 
 
