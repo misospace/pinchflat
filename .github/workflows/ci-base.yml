@@ -16,8 +16,8 @@ jobs:
       contents: read
       packages: write
     env:
-      IMAGE_REPO: ghcr.io/communitymaintained/pinchflat-ci-base
-      CI_BASE_IMAGE: ghcr.io/communitymaintained/pinchflat-ci-base:latest
+      IMAGE_REPO: ghcr.io/philmichel/pinchflat-ci-base
+      CI_BASE_IMAGE: ghcr.io/philmichel/pinchflat-ci-base:latest
 
     steps:
       - name: Checkout

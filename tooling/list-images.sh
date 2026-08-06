@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ORG="${1:-CommunityMaintained}"
+ORG="${1:-philmichel}"
 IMAGE="${2:-pinchflat}"
 ORG_LOWER=$(echo "$ORG" | tr '[:upper:]' '[:lower:]')
 TOKEN=$(gh auth token)
 
 echo "Fetching versions for ${ORG}/${IMAGE}..."
-VERSIONS=$(gh api --paginate /orgs/$ORG/packages/container/$IMAGE/versions)
+# philmichel is a user account, not an org — /users/, not /orgs/
+VERSIONS=$(gh api --paginate /users/$ORG/packages/container/$IMAGE/versions)
 
 echo "$VERSIONS" | jq -c '.[] | select(.metadata.container.tags | length > 0)' | while read -r version; do
   TAG=$(echo "$version" | jq -r '.metadata.container.tags[0]')
