@@ -1,3 +1,4 @@
+---
 name: Release Image
 
 # Dispatch-only publisher for this snapshot repo: builds the selfhosted image

@@ -1,3 +1,4 @@
+---
 name: Dev Image Cleanup
 
 # Dispatch-only in this snapshot repo: the nightly schedule needs the

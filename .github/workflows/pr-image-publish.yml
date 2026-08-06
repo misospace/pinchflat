@@ -1,3 +1,4 @@
+---
 name: Publish PR Image
 
 # Runs after CI finishes and pushes the PR image built by ci.yml's docker-pr
