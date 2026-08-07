@@ -51,7 +51,7 @@ defmodule Pinchflat.TestingHelperMethods do
     # repo happens to live there. Rebase onto the current checkout instead.
     json_filepath
     |> File.read!()
-    |> String.replace("/app/test/", Path.join(File.cwd!(), "test") <> "/")
+    |> String.replace("/app/", File.cwd!() <> "/")
   end
 
   def render_parsed_metadata(metadata_name) do
