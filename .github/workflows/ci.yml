@@ -3,7 +3,7 @@ name: CI
 
 on:
   pull_request:
-    branches: ['master']
+    branches: ['main']
     types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
@@ -16,7 +16,7 @@ env:
   # This snapshot repo builds its own base via ci-base.yml; latest = that build.
   # NOTE: keep this in sync with the test job's container.image — the env context
   # isn't available there, so the ref is duplicated and must be bumped in both.
-  CI_BASE_IMAGE: ghcr.io/philmichel/pinchflat-ci-base:latest
+  CI_BASE_IMAGE: ghcr.io/misospace/pinchflat-ci-base:latest
 
 jobs:
   test:
@@ -30,7 +30,7 @@ jobs:
     # workspace into the container, so no compose, no detached keepalive, and no
     # `exec -T` TTY workaround are needed.
     container:
-      image: ghcr.io/philmichel/pinchflat-ci-base:latest
+      image: ghcr.io/misospace/pinchflat-ci-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

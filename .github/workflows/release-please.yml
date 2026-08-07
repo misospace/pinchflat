@@ -3,13 +3,13 @@ name: Release Please
 
 on:
   push:
-    branches: ['master']
+    branches: ['main']
 
 env:
   # This snapshot repo builds its own base via ci-base.yml; latest = that build.
   # NOTE: keep this in sync with the test job's container.image — the env context
   # isn't available there, so the ref is duplicated and must be bumped in both.
-  CI_BASE_IMAGE: ghcr.io/philmichel/pinchflat-ci-base:latest
+  CI_BASE_IMAGE: ghcr.io/misospace/pinchflat-ci-base:latest
 
 jobs:
   test:
@@ -22,7 +22,7 @@ jobs:
     # the workspace into the container, so no compose, no detached keepalive, and
     # no `exec -T` TTY workaround are needed.
     container:
-      image: ghcr.io/philmichel/pinchflat-ci-base:latest
+      image: ghcr.io/misospace/pinchflat-ci-base:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

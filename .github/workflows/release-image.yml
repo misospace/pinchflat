@@ -2,7 +2,7 @@
 name: Release Image
 
 # Dispatch-only publisher for this snapshot repo: builds the selfhosted image
-# at the given ref and pushes ghcr.io/philmichel/pinchflat:<version.txt> +
+# at the given ref and pushes ghcr.io/misospace/pinchflat:<version.txt> +
 # latest. release-please's docker job only fires on releases it creates, which
 # a frozen snapshot never has.
 
@@ -12,10 +12,10 @@ on:
       ref:
         description: 'Branch, tag, or SHA to build'
         required: false
-        default: 'master'
+        default: 'main'
 
 env:
-  CI_BASE_IMAGE: ghcr.io/philmichel/pinchflat-ci-base:latest
+  CI_BASE_IMAGE: ghcr.io/misospace/pinchflat-ci-base:latest
 
 jobs:
   build:
