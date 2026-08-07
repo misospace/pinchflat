@@ -5,6 +5,12 @@ name: Release Image
 # at the given ref and pushes ghcr.io/misospace/pinchflat:<version.txt> +
 # latest. release-please's docker job only fires on releases it creates, which
 # a frozen snapshot never has.
+#
+# Each platform builds on a runner of its own architecture and pushes by digest;
+# the merge job assembles the manifest list. Emulating arm64 through QEMU on an
+# amd64 runner made this a ~25 minute job, nearly all of it the emulated Elixir
+# compile. Native runners also let the two platforms run concurrently, so the
+# wall clock is the slower single platform rather than the sum.
 
 on:
   workflow_dispatch:
@@ -19,8 +25,75 @@ env:
 
 jobs:
   build:
-    name: Build and Push Release Image
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ startsWith(matrix.platform, 'linux/arm') && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Prepare
+        id: prep
+        run: |
+          echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+          echo "arch=${MATRIX_PLATFORM##*/}" >> $GITHUB_OUTPUT
+        env:
+          MATRIX_PLATFORM: ${{ matrix.platform }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: ./docker/selfhosted.Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: CI_BASE_IMAGE=${{ env.CI_BASE_IMAGE }}
+          outputs: type=image,name=ghcr.io/${{ steps.prep.outputs.repo }},push-by-digest=true,name-canonical=true,push=true
+          # Scoped per arch: a shared scope makes the two concurrent jobs evict
+          # each other's layers, which costs more than it saves.
+          cache-from: type=gha,scope=release-${{ steps.prep.outputs.arch }}
+          cache-to: type=gha,mode=max,scope=release-${{ steps.prep.outputs.arch }}
+
+      - name: Export digest
+        run: |
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - name: Upload digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-digests-${{ steps.prep.outputs.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge and Push Manifest
+    runs-on: ubuntu-24.04
+    needs: build
     permissions:
       contents: read
       packages: write
@@ -47,11 +120,12 @@ jobs:
             type=raw,value=${{ steps.meta.outputs.version }}
             type=raw,value=latest
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - name: Download digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: release-digests-*
+          merge-multiple: true
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -60,15 +134,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
-        with:
-          context: .
-          file: ./docker/selfhosted.Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.docker_meta.outputs.tags }}
-          labels: ${{ steps.docker_meta.outputs.labels }}
-          build-args: CI_BASE_IMAGE=${{ env.CI_BASE_IMAGE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          IMAGE="ghcr.io/${{ steps.meta.outputs.repo }}"
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${IMAGE}@sha256:%s " *)
+
+      - name: Inspect
+        run: |
+          docker buildx imagetools inspect \
+            "ghcr.io/${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.version }}"
