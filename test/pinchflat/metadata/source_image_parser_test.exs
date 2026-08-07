@@ -21,7 +21,7 @@ defmodule Pinchflat.Metadata.SourceImageParserTest do
     test "returns the avatar_uncropped as the poster" do
       metadata = %{
         "thumbnails" => [
-          %{"id" => "avatar_uncropped", "filepath" => "/app/test/support/files/channel_photos/a.0.jpg"}
+          %{"id" => "avatar_uncropped", "filepath" => "#{File.cwd!()}/test/support/files/channel_photos/a.0.jpg"}
         ]
       }
 
@@ -35,7 +35,7 @@ defmodule Pinchflat.Metadata.SourceImageParserTest do
     test "returns the banner_uncropped as the fanart" do
       metadata = %{
         "thumbnails" => [
-          %{"id" => "banner_uncropped", "filepath" => "/app/test/support/files/channel_photos/a.0.jpg"}
+          %{"id" => "banner_uncropped", "filepath" => "#{File.cwd!()}/test/support/files/channel_photos/a.0.jpg"}
         ]
       }
 
@@ -82,7 +82,7 @@ defmodule Pinchflat.Metadata.SourceImageParserTest do
         "thumbnails" => [],
         "entries" => [
           %{
-            "thumbnails" => [%{"filepath" => "/app/test/support/files/channel_photos/a.0.jpg"}]
+            "thumbnails" => [%{"filepath" => "#{File.cwd!()}/test/support/files/channel_photos/a.0.jpg"}]
           }
         ]
       }

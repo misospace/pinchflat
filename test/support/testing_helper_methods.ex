@@ -46,7 +46,12 @@ defmodule Pinchflat.TestingHelperMethods do
         "#{metadata_name}.json"
       ])
 
-    File.read!(json_filepath)
+    # The fixtures mirror real yt-dlp output, which emits ABSOLUTE paths. They were
+    # captured on a checkout at /app, so reading them verbatim only works when the
+    # repo happens to live there. Rebase onto the current checkout instead.
+    json_filepath
+    |> File.read!()
+    |> String.replace("/app/", File.cwd!() <> "/")
   end
 
   def render_parsed_metadata(metadata_name) do
