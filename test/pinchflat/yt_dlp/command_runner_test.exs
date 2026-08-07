@@ -19,7 +19,7 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
     end
 
     test "considers a 101 exit code as being successful" do
-      wrap_executable("/app/test/support/scripts/yt-dlp-mocks/101_exit_code.sh", fn ->
+      wrap_executable("#{File.cwd!()}/test/support/scripts/yt-dlp-mocks/101_exit_code.sh", fn ->
         assert {:ok, _output} = Runner.run(@media_url, :foo, [], "")
       end)
     end
@@ -214,7 +214,7 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
     end
 
     test "treats a 100 exit code (yt-dlp's update error code) as a failure" do
-      wrap_executable("/app/test/support/scripts/yt-dlp-mocks/100_exit_code.sh", fn ->
+      wrap_executable("#{File.cwd!()}/test/support/scripts/yt-dlp-mocks/100_exit_code.sh", fn ->
         assert {:error, _output} = Runner.update("nightly")
       end)
     end
