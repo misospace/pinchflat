@@ -2,7 +2,7 @@ name: AI PR Review
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ['main']
     # `labeled` enables the one-click re-review: add the `ai-review` label to
     # force a fresh review (only write/triage can label — self-authorizing).
     types: [opened, reopened, synchronize, ready_for_review, labeled]
@@ -42,8 +42,8 @@ jobs:
         uses: misospace/pr-reviewer-action@99e7764a4906f94d99c249231d2016c3cda8997e # v2.2.0
         with:
           github_token: ${{ steps.app-token.outputs.token }}
-          ai_primary_retries: "3"
-          ai_primary_retry_delay_sec: "15"
+          ai_primary_retries: '3'
+          ai_primary_retry_delay_sec: '15'
           ai_base_url: ${{ vars.LITELLM_URL }}
           ai_api_format: ${{ vars.PRIMARY_FORMAT }}
           ai_model: ${{ vars.PRIMARY_MODEL }}
@@ -60,21 +60,21 @@ jobs:
           ai_smart_model: ${{ vars.SMART_MODEL }}
           ai_smart_api_key: ${{ secrets.LITELLM_API_KEY }}
           context_limit_mode: normal
-          ci_status_check: "true"
-          ci_timeout_sec: "600"
+          ci_status_check: 'true'
+          ci_timeout_sec: '600'
           tool_mode: native_loop
-          tool_max_rounds: "2"
-          tool_max_requests: "4"
-          tool_loop_wall_clock_sec: "300"
-          tool_planning_timeout_sec: "300"
-          tool_planning_max_context_bytes: "15000"
-          tool_planning_max_tokens: "16000"
-          tool_max_response_bytes: "12000"
-          tool_allowed_gh_api_repos: "*"
-          tool_request_timeout_sec: "15"
-          tool_enable_for_forks: "false"
+          tool_max_rounds: '2'
+          tool_max_requests: '4'
+          tool_loop_wall_clock_sec: '300'
+          tool_planning_timeout_sec: '300'
+          tool_planning_max_context_bytes: '15000'
+          tool_planning_max_tokens: '16000'
+          tool_max_response_bytes: '12000'
+          tool_allowed_gh_api_repos: '*'
+          tool_request_timeout_sec: '15'
+          tool_enable_for_forks: 'false'
           on_model_failure: notice
-          inline_findings: "true"
+          inline_findings: 'true'
           verdict_policy: findings_severity_gated
           publish_mode: review_verdict
-          allow_approve: "true"
+          allow_approve: 'true'
