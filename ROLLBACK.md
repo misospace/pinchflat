@@ -39,7 +39,7 @@ docker stop tubeless
 docker run --rm -it \
   -v tubeless_config:/config \
   -v "$PWD/rollback.sh:/rollback.sh:ro" \
-  ghcr.io/communitymaintained/tubeless:latest \
+  ghcr.io/misospace/tubeless:latest \
   bash /rollback.sh /config/db/pinchflat.db
 ```
 

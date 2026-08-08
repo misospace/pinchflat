@@ -70,7 +70,7 @@ docker build -f selfhosted.og.Dockerfile -t pinchflat:local .
 Requires `gh` CLI auth.
 
 ```bash
-bash tooling/list-images.sh                         # CommunityMaintained/pinchflat
+bash tooling/list-images.sh                         # misospace/pinchflat
 bash tooling/list-images.sh MyOrg my-image-name    # custom org/image
 ```
 

@@ -115,7 +115,7 @@ Docker Compose file:
 ```yaml
 services:
   pinchflat:
-    image: ghcr.io/communitymaintained/pinchflat:latest
+    image: ghcr.io/misospace/pinchflat:latest
     environment:
       # Set the timezone to your local timezone
       - TZ=America/New_York
@@ -130,9 +130,9 @@ services:
 
 1. Create two directories on your host machine: one for storing config and one for storing downloaded media. Make sure they're both writable by the user running the Docker container.
 2. Prepare the Docker image in one of the two ways below:
-   - **From GHCR:** `docker pull ghcr.io/communitymaintained/pinchflat:latest`
-     - NOTE: also available on Docker Hub at `communitymaintained/pinchflat:latest`
-   - **Building locally:** `docker build . --file docker/selfhosted.Dockerfile -t ghcr.io/communitymaintained/pinchflat:latest`
+   - **From GHCR:** `docker pull ghcr.io/misospace/pinchflat:latest`
+     - NOTE: also available on Docker Hub at `misospace/pinchflat:latest`
+   - **Building locally:** `docker build . --file docker/selfhosted.Dockerfile -t ghcr.io/misospace/pinchflat:latest`
 3. Run the container:
 
 ```bash
@@ -144,7 +144,7 @@ docker run \
   -p 8945:8945 \
   -v /host/path/to/config:/config \
   -v /host/path/to/downloads:/downloads \
-  ghcr.io/communitymaintained/pinchflat:latest
+  ghcr.io/misospace/pinchflat:latest
 ```
 
 ### Podman
@@ -159,7 +159,7 @@ podman run \
   -p 8945:8945 \
   -v /host/path/to/config:/config:rw \
   -v /host/path/to/downloads/:/downloads:rw \
-  ghcr.io/communitymaintained/pinchflat:latest
+  ghcr.io/misospace/pinchflat:latest
 ```
 
 Using this setup, consider creating a new `pinchflat` user and giving that user ownership of the config and download directory. See [Podman --userns](https://docs.podman.io/en/v4.6.1/markdown/options/userns.container.html) docs.
@@ -220,10 +220,10 @@ home.example.com:443 {
 The data format is identical — no database changes are needed. Just update the image reference in your Docker run command or compose file:
 
 ```text
-ghcr.io/kieraneglin/pinchflat:latest  →  ghcr.io/communitymaintained/pinchflat:latest
+ghcr.io/kieraneglin/pinchflat:latest  →  ghcr.io/misospace/pinchflat:latest
 ```
 
-Also available on Docker Hub as `communitymaintained/pinchflat:latest`.
+Also available on Docker Hub as `misospace/pinchflat:latest`.
 
 Stop the old container, update the image reference, and start it again. Your `/config` and `/downloads` volumes carry over unchanged.
 
