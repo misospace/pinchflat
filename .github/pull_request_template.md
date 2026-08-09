@@ -1,4 +1,4 @@
-**PLEASE NOTE:** Only critical issues will be addressed in this fork. For new features or minor issues, please consider switching to [Tubeless](https://github.com/CommunityMaintained/tubeless). See [Pinchflat vs. Tubeless](https://github.com/CommunityMaintained/pinchflat/blob/master/priv/static/images/pinchflat-vs-tubeless.png) for more details.
+**PLEASE NOTE:** Only critical issues will be addressed in this fork. For new features or minor issues, please consider switching to [Tubeless](https://github.com/misospace/tubeless). See [Pinchflat vs. Tubeless](https://github.com/misospace/pinchflat/blob/master/priv/static/images/pinchflat-vs-tubeless.png) for more details.
 
 ## What's new?
 
