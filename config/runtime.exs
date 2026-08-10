@@ -129,14 +129,28 @@ if config_env() == :prod do
       System.get_env("SECRET_KEY_BASE")
     else
       if System.get_env("RUN_CONTEXT") == "selfhosted" do
-        # Using the default SECRET_KEY_BASE in a conventional production environment
-        # is dangerous. Please set the SECRET_KEY_BASE environment variable if you're
-        # deploying this to an internet-facing server. If you're running this in a
-        # private network, it's likely safe to use the default value. If you want
-        # to be extra safe, run `mix phx.gen.secret` and set the SECRET_KEY_BASE
-        # environment variable to the output of that command.
+        # Auto-generate and persist a unique key in the config directory on first boot.
+        # This avoids the risk of a hardcoded default being shared across all installs.
+        secret_key_path = Path.join(config_path, ".secret_key_base")
 
-        "ZkuQMStdmUzBv+gO3m3XZrtQW76e+AX3QIgTLajw3b/HkTLMEx+DOXr2WZsSS+n8"
+        secret_key_base =
+          case File.read(secret_key_path) do
+            {:ok, key} ->
+              String.trim(key)
+
+            _ ->
+              generated = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+              File.write!(secret_key_path, generated <> "\n")
+
+              Logger.warning(
+                "Generated new SECRET_KEY_BASE at #{secret_key_path}. " <>
+                  "If you want to rotate it, delete the file and restart."
+              )
+
+              generated
+          end
+
+        secret_key_base
       else
         raise """
         environment variable SECRET_KEY_BASE is missing.
