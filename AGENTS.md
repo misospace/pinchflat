@@ -150,7 +150,7 @@ CI is `.github/workflows/ci.yml`, job name **"Lint and Test"** — the only requ
 mix check --no-fix --no-retry
 ```
 
-`mix check` is aliased to `check --config=tooling/.check.exs` (`mix.exs`), which enables, in order: `compiler`, `formatter`, `sobelow`, `prettier_formatting` (`yarn run lint:check`), and `ex_unit` with `EX_CHECK=1`.
+`mix check` is aliased to `check --config=tooling/.check.exs` (`mix.exs`), which enables, in order: `compiler`, `formatter`, `mix_audit` (`mix deps.audit`), `sobelow`, `prettier_formatting` (`yarn run lint:check`), and `ex_unit` with `EX_CHECK=1`.
 
 The external automation gate runs these four separately from a clone at `/work`, in a container, as a non-root uid. **All four are green today (1208 tests, 0 failures) — a PR that breaks one is the PR's fault, not flake:**
 

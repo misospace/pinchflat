@@ -94,6 +94,7 @@
 | -------------------- | --------- | -------------------------------------------------------------- |
 | Credo + credo_naming | dev/test  | Elixir static analysis and naming conventions                  |
 | Sobelow              | dev/test  | Security vulnerability scanner                                 |
+| mix_audit            | dev/test  | Dependency vulnerability scanner (`mix deps.audit`)            |
 | ex_check             | dev/test  | Unified check runner (`mix check`) — orchestrates all tools    |
 | Mox                  | test      | Mock library for behaviour-based test doubles                  |
 | LazyHTML             | test      | HTML parser for controller/LiveView test assertions            |
@@ -176,14 +177,14 @@ Both files are CI/release only — they are never run locally.
 
 All linting config files are used in both local dev and CI (CI runs `mix check` which invokes them all).
 
-| File                 | Used in | Purpose                                                                                                           |
-| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `.formatter.exs`     | both    | Elixir formatter config (120-char line length, LiveView HTML formatter)                                           |
-| `tooling/.credo.exs` | both    | Credo static analysis config                                                                                      |
-| `tooling/.check.exs` | both    | `ex_check` runner config — orchestrates compiler, formatter, Sobelow, Prettier, ExUnit (warnings-as-errors in CI) |
-| `.sobelow-conf`      | both    | Sobelow security scanner config (suppresses single-user/self-hosted warnings)                                     |
-| `.prettierrc.js`     | both    | Prettier config (100-char width, single quotes, LF line endings, trailing comma off)                              |
-| `.prettierignore`    | both    | Prettier ignore patterns                                                                                          |
+| File                 | Used in | Purpose                                                                                                                      |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `.formatter.exs`     | both    | Elixir formatter config (120-char line length, LiveView HTML formatter)                                                      |
+| `tooling/.credo.exs` | both    | Credo static analysis config                                                                                                 |
+| `tooling/.check.exs` | both    | `ex_check` runner config — orchestrates compiler, formatter, mix_audit, Sobelow, Prettier, ExUnit (warnings-as-errors in CI) |
+| `.sobelow-conf`      | both    | Sobelow security scanner config (suppresses single-user/self-hosted warnings)                                                |
+| `.prettierrc.js`     | both    | Prettier config (100-char width, single quotes, LF line endings, trailing comma off)                                         |
+| `.prettierignore`    | both    | Prettier ignore patterns                                                                                                     |
 
 Run everything with `mix check`. Individual tools: `mix credo`, `mix sobelow`, `yarn run lint:check`.
 

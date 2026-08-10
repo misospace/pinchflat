@@ -85,7 +85,15 @@ defmodule Pinchflat.MixProject do
       {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.16.0", only: [:dev, :test], runtime: false},
       {:faker, "~> 0.19", only: :test},
-      {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false}
+      {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      # Force decimal 3.x to pull in the fix for GHSA-rhv4-8758-jx7v
+      # (unbounded exponent DoS in Decimal.new). 2.4.1 is the newest 2.x and is
+      # still vulnerable (2.4.0's mitigation isn't enabled by default), and
+      # ecto/ecto_sqlite3 request ~> 2.0, so an override is required. Safe here:
+      # no schema or migration uses the :decimal type, and the full test suite
+      # passes with 3.x on the lockfile.
+      {:decimal, "~> 3.0", override: true}
     ]
   end
 
