@@ -32,10 +32,23 @@ defmodule PinchflatWeb.Plugs do
   end
 
   @doc """
-  Removes the `x-frame-options` header from the response to allow the page to be embedded in an iframe.
+  Removes the `x-frame-options` header so the response can be embedded in an iframe, and adds
+  the baseline security headers (plus CORS) that the `:browser` pipeline's
+  `put_secure_browser_headers` would normally provide.
+
+  Scoped to the `:feed` pipeline only — the settings/diagnostics UI in `:browser` retains
+  `x-frame-options: SAMEORIGIN` to prevent clickjacking. Public podcast/RSS feeds bypass
+  basic auth intentionally (see AGENTS.md), so they need CORS for browser-based podcast
+  readers and image hot-linking.
   """
   def allow_iframe_embed(conn, _opts) do
-    delete_resp_header(conn, "x-frame-options")
+    conn
+    |> delete_resp_header("x-frame-options")
+    |> put_resp_header("access-control-allow-origin", "*")
+    |> put_resp_header("x-content-type-options", "nosniff")
+    |> put_resp_header("x-download-options", "noopen")
+    |> put_resp_header("referrer-policy", "strict-origin-when-cross-origin")
+    |> put_resp_header("permissions-policy", "camera=(), microphone=(), geolocation=()")
   end
 
   @doc """
