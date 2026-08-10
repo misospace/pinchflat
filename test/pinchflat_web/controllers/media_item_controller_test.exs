@@ -320,6 +320,42 @@ defmodule PinchflatWeb.MediaItemControllerTest do
       assert conn.status == 200
       assert conn.resp_body == contents
     end
+
+    test "returns 416 when range start is beyond EOF", %{conn: conn, media_item: media_item} do
+      filesize = File.stat!(media_item.media_filepath).size
+
+      conn =
+        conn
+        |> put_req_header("range", "bytes=#{filesize + 1}-")
+        |> get(~p"/media/#{media_item.uuid}/stream")
+
+      assert conn.status == 416
+      assert {"content-range", "bytes */#{filesize}"} in conn.resp_headers
+    end
+
+    test "returns 416 when range start and end are both beyond EOF", %{conn: conn, media_item: media_item} do
+      filesize = File.stat!(media_item.media_filepath).size
+
+      conn =
+        conn
+        |> put_req_header("range", "bytes=#{filesize + 1}-#{filesize + 100}")
+        |> get(~p"/media/#{media_item.uuid}/stream")
+
+      assert conn.status == 416
+      assert {"content-range", "bytes */#{filesize}"} in conn.resp_headers
+    end
+
+    test "returns 416 for extremely large range start offset", %{conn: conn, media_item: media_item} do
+      filesize = File.stat!(media_item.media_filepath).size
+
+      conn =
+        conn
+        |> put_req_header("range", "bytes=999999999999999999-")
+        |> get(~p"/media/#{media_item.uuid}/stream")
+
+      assert conn.status == 416
+      assert {"content-range", "bytes */#{filesize}"} in conn.resp_headers
+    end
   end
 
   defp create_media_item(_) do

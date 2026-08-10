@@ -88,6 +88,13 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
           |> put_resp_header("content-disposition", "inline; filename=\"#{media_item.title}\"")
           |> send_file(206, media_item.media_filepath, start_pos, length)
 
+        {:error, :range_not_satisfiable} ->
+          Logger.debug("Range not satisfiable for media item: #{media_item.uuid}")
+
+          conn
+          |> put_resp_header("content-range", "bytes */#{file_size}")
+          |> send_resp(416, "Range Not Satisfiable")
+
         {:error, :invalid_range} ->
           Logger.debug("Invalid range request for media item: #{media_item.uuid} - serving full file")
 
@@ -126,10 +133,16 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
       {:error, _} ->
         {:error, :invalid_range}
 
+      {{start_pos, _}, :error} when start_pos >= file_size ->
+        {:error, :range_not_satisfiable}
+
       {{start_pos, _}, :error} ->
         {:ok, {start_pos, file_size - 1}}
 
       # See RFC7233
+      {{start_pos, _}, {_end_pos, _}} when start_pos >= file_size ->
+        {:error, :range_not_satisfiable}
+
       {{start_pos, _}, {end_pos, _}} when end_pos >= file_size ->
         {:ok, {start_pos, file_size - 1}}
 
