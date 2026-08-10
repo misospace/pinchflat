@@ -357,6 +357,6 @@ unless the rail below vouches — costing a revision cycle and an escalation rev
 The scope-overlap rail vouches for a diff that touches a named file, and that vouch is
 what survives a paraphrased ask.
 
-Name only paths you are confident about. An issue that names files the diff does *not*
+Name only paths you are confident about. An issue that names files the diff does _not_
 touch is read as scope drift and also gets the change rejected — so when unsure, name
 none rather than guessing.

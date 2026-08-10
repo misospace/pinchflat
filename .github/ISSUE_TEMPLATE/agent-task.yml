@@ -1,6 +1,6 @@
 name: Agent task
 description: Work item for the autonomous coding loop (dispatch → foreman)
-labels: ["type/chore"]
+labels: ['type/chore']
 body:
   - type: markdown
     attributes:

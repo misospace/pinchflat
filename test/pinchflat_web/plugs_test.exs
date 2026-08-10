@@ -3,6 +3,7 @@ defmodule PinchflatWeb.PlugsTest do
 
   alias PinchflatWeb.Plugs
   alias Pinchflat.Settings
+  alias Pinchflat.SourcesFixtures
 
   describe "maybe_basic_auth/2" do
     setup do
@@ -131,6 +132,68 @@ defmodule PinchflatWeb.PlugsTest do
       conn = Plugs.allow_iframe_embed(conn, [])
 
       assert [] = get_resp_header(conn, "x-frame-options")
+    end
+
+    test "adds CORS plus baseline security headers for embeddable feed responses", %{conn: conn} do
+      conn = Plugs.allow_iframe_embed(conn, [])
+
+      assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+      assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(conn, "x-download-options") == ["noopen"]
+      assert get_resp_header(conn, "referrer-policy") == ["strict-origin-when-cross-origin"]
+      assert get_resp_header(conn, "permissions-policy") == ["camera=(), microphone=(), geolocation=()"]
+    end
+
+    test "is idempotent: running twice does not duplicate headers", %{conn: conn} do
+      conn =
+        conn
+        |> Plugs.allow_iframe_embed([])
+        |> Plugs.allow_iframe_embed([])
+
+      assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+      assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(conn, "x-download-options") == ["noopen"]
+      assert get_resp_header(conn, "referrer-policy") == ["strict-origin-when-cross-origin"]
+      assert get_resp_header(conn, "permissions-policy") == ["camera=(), microphone=(), geolocation=()"]
+    end
+  end
+
+  describe "iframe-embed scoping (issue #12)" do
+    test "GET /settings (browser pipeline) keeps the CSP embedding restriction" do
+      # Phoenix 1.7+ blocks embedding via CSP `frame-ancestors 'self'` instead of
+      # `x-frame-options`, and `allow_iframe_embed` is no longer in the :browser pipeline —
+      # so the admin UI stays non-embeddable and never gets the feed-only CORS headers.
+      conn = get(build_conn(), ~p"/settings")
+
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert csp =~ "frame-ancestors 'self'"
+
+      assert get_resp_header(conn, "access-control-allow-origin") == []
+      assert get_resp_header(conn, "permissions-policy") == []
+    end
+
+    test "GET /sources/:uuid/feed (feed pipeline) is embeddable and exposes CORS" do
+      # Feed endpoints are public (bypass basic auth) so we can assert headers directly.
+      old_setting = Application.get_env(:pinchflat, :expose_feed_endpoints)
+      Application.put_env(:pinchflat, :expose_feed_endpoints, true)
+
+      on_exit(fn ->
+        if old_setting == nil do
+          Application.delete_env(:pinchflat, :expose_feed_endpoints)
+        else
+          Application.put_env(:pinchflat, :expose_feed_endpoints, old_setting)
+        end
+      end)
+
+      source = SourcesFixtures.source_fixture()
+      conn = get(build_conn(), "/sources/#{source.uuid}/feed")
+
+      assert get_resp_header(conn, "x-frame-options") == []
+      assert get_resp_header(conn, "content-security-policy") == []
+      assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
+      assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(conn, "x-download-options") == ["noopen"]
+      assert get_resp_header(conn, "referrer-policy") == ["strict-origin-when-cross-origin"]
     end
   end
 
