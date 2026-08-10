@@ -150,7 +150,7 @@ CI is `.github/workflows/ci.yml`, job name **"Lint and Test"** — the only requ
 mix check --no-fix --no-retry
 ```
 
-`mix check` is aliased to `check --config=tooling/.check.exs` (`mix.exs`), which enables, in order: `compiler`, `formatter`, `sobelow`, `prettier_formatting` (`yarn run lint:check`), and `ex_unit` with `EX_CHECK=1`.
+`mix check` is aliased to `check --config=tooling/.check.exs` (`mix.exs`), which enables, in order: `compiler`, `formatter`, `mix_audit` (`mix deps.audit`), `sobelow`, `prettier_formatting` (`yarn run lint:check`), and `ex_unit` with `EX_CHECK=1`.
 
 The external automation gate runs these four separately from a clone at `/work`, in a container, as a non-root uid. **All four are green today (1208 tests, 0 failures) — a PR that breaks one is the PR's fault, not flake:**
 
@@ -342,3 +342,21 @@ Real inconsistencies in the tree. Flag them if a PR touches the area; don't file
 | `ROLLBACK.md` and `rollback.sh` claim 18 migrations from `20260618215000` to `20260805120000` | Only the first **three** exist in this repo. Both files were inherited from a different downstream ("Tubeless") during the rehome and do **not** describe this fork's schema. `Pinchflat.Release.prep_for_upstream/0` is the authoritative rollback path |
 | `DEVELOPMENT.md:65` builds `selfhosted.og.Dockerfile`                                         | No such file exists — the only Dockerfiles are under `docker/`                                                                                                                                                                                           |
 | `tooling/version_bump.sh` / `mix version.bump` emit a `YYYY.M.D` version                      | Legacy, predates release-please. Versioning is release-please + `version.txt`                                                                                                                                                                            |
+
+## Filing issues for the autonomous loop
+
+Issues here are picked up by an autonomous coding loop (dispatch → foreman), and two
+parts of the body feed deterministic reviewer rails. Agents filing issues in this repo
+must include both.
+
+**1. State the ask in one imperative sentence.** The reviewer quotes it verbatim to
+prove it actually read the issue. If it can only paraphrase, its GO is demoted to NO-GO
+unless the rail below vouches — costing a revision cycle and an escalation review.
+
+**2. Name the concrete file paths the fix is expected to touch** (backticks are fine).
+The scope-overlap rail vouches for a diff that touches a named file, and that vouch is
+what survives a paraphrased ask.
+
+Name only paths you are confident about. An issue that names files the diff does *not*
+touch is read as scope drift and also gets the change rejected — so when unsure, name
+none rather than guessing.

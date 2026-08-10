@@ -43,7 +43,7 @@ tooling/lint_test.sh                          # full `mix check` — the pre-com
 ## Quality Checks
 
 ```bash
-mix check              # full CI suite: formatter + compiler + sobelow + prettier + ex_unit
+mix check              # full CI suite: formatter + compiler + mix_audit + sobelow + prettier + ex_unit
 ```
 
 Individual:
