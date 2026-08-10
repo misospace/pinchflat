@@ -36,10 +36,11 @@ defmodule PinchflatWeb.Plugs do
   the baseline security headers (plus CORS) that the `:browser` pipeline's
   `put_secure_browser_headers` would normally provide.
 
-  Scoped to the `:feed` pipeline only — the settings/diagnostics UI in `:browser` retains
-  `x-frame-options: SAMEORIGIN` to prevent clickjacking. Public podcast/RSS feeds bypass
-  basic auth intentionally (see AGENTS.md), so they need CORS for browser-based podcast
-  readers and image hot-linking.
+  Scoped to the `:feed` pipeline only — the settings/diagnostics UI in `:browser` keeps
+  `put_secure_browser_headers`'s CSP `frame-ancestors 'self'` to prevent clickjacking
+  (Phoenix 1.7+ no longer emits `x-frame-options`; the CSP directive is the embedding
+  protection). Public podcast/RSS feeds bypass basic auth intentionally (see AGENTS.md), so
+  they need CORS for browser-based podcast readers and image hot-linking.
   """
   def allow_iframe_embed(conn, _opts) do
     conn

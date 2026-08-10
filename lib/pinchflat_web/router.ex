@@ -21,10 +21,11 @@ defmodule PinchflatWeb.Router do
 
   # Pipeline for public podcast feed endpoints (RSS, OPML, cover images, media streams).
   # These intentionally bypass basic auth and need to be embeddable in iframes for podcast
-  # directories — `allow_iframe_embed` strips X-Frame-Options and adds CORS plus the
-  # security headers that `:browser`'s `put_secure_browser_headers` would otherwise supply.
+  # directories — `allow_iframe_embed` strips `x-frame-options` and adds CORS plus the
+  # baseline security headers the `:browser` pipeline's `put_secure_browser_headers` would
+  # otherwise supply. No `:accepts` plug here: these controllers send raw responses, and
+  # podcast readers send varied Accept headers that content negotiation could reject.
   pipeline :feed do
-    plug :accepts, ["xml", "html", "json", "png", "jpeg", "*"]
     plug :allow_iframe_embed
   end
 

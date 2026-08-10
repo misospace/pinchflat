@@ -152,25 +152,27 @@ defmodule PinchflatWeb.PlugsTest do
 
       assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
       assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(conn, "x-download-options") == ["noopen"]
+      assert get_resp_header(conn, "referrer-policy") == ["strict-origin-when-cross-origin"]
+      assert get_resp_header(conn, "permissions-policy") == ["camera=(), microphone=(), geolocation=()"]
     end
   end
 
   describe "iframe-embed scoping (issue #12)" do
-    test "GET /settings (browser pipeline) retains x-frame-options: SAMEORIGIN" do
-      # Sanity: the :browser pipeline's put_secure_browser_headers should still set XFO
-      # because allow_iframe_embed is no longer in that pipeline.
+    test "GET /settings (browser pipeline) keeps the CSP embedding restriction" do
+      # Phoenix 1.7+ blocks embedding via CSP `frame-ancestors 'self'` instead of
+      # `x-frame-options`, and `allow_iframe_embed` is no longer in the :browser pipeline —
+      # so the admin UI stays non-embeddable and never gets the feed-only CORS headers.
       conn = get(build_conn(), ~p"/settings")
 
-      assert get_resp_header(conn, "x-frame-options") == ["SAMEORIGIN"]
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert csp =~ "frame-ancestors 'self'"
+
+      assert get_resp_header(conn, "access-control-allow-origin") == []
+      assert get_resp_header(conn, "permissions-policy") == []
     end
 
-    test "GET /login (browser pipeline) retains x-frame-options: SAMEORIGIN" do
-      conn = get(build_conn(), ~p"/login")
-
-      assert get_resp_header(conn, "x-frame-options") == ["SAMEORIGIN"]
-    end
-
-    test "GET /sources/:uuid/feed (feed pipeline) lacks x-frame-options and exposes CORS" do
+    test "GET /sources/:uuid/feed (feed pipeline) is embeddable and exposes CORS" do
       # Feed endpoints are public (bypass basic auth) so we can assert headers directly.
       old_setting = Application.get_env(:pinchflat, :expose_feed_endpoints)
       Application.put_env(:pinchflat, :expose_feed_endpoints, true)
@@ -187,8 +189,11 @@ defmodule PinchflatWeb.PlugsTest do
       conn = get(build_conn(), "/sources/#{source.uuid}/feed")
 
       assert get_resp_header(conn, "x-frame-options") == []
+      assert get_resp_header(conn, "content-security-policy") == []
       assert get_resp_header(conn, "access-control-allow-origin") == ["*"]
       assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(conn, "x-download-options") == ["noopen"]
+      assert get_resp_header(conn, "referrer-policy") == ["strict-origin-when-cross-origin"]
     end
   end
 
