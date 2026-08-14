@@ -97,7 +97,7 @@ The executable path and runner module are injected via application config (`yt_d
 
 1. `stable` resolves the exact latest stable version via `ReleaseLookup` (GitHub API) and targets `yt-dlp/yt-dlp@<version>`, **not** the `stable` channel, because a plain `--update` refuses to move backwards and would strand a user on a newer nightly. Falls back to the channel update if the lookup fails.
 2. An exact nightly pins via the **channel alias** `nightly@<version>`; a `yt-dlp/yt-dlp_nightly@<tag>` repo path does not resolve.
-3. The recurring cron/boot run **re-asserts** the held version for `pinned`, `nightly_frozen`, and a still-holding `nightly_until_stable` rather than no-op'ing — yt-dlp lives on the container's ephemeral filesystem, so an image swap reverts it to the baked-in build.
+3. The recurring cron run **re-asserts** the held version for `pinned`, `nightly_frozen`, and a still-holding `nightly_until_stable` rather than no-op'ing — yt-dlp lives on the container's ephemeral filesystem, so an image swap reverts it to the baked-in build. The boot run only re-asserts for those held/pinned policies too, but skips `stable` and `nightly` so a container restart doesn't fire a GitHub API call at random and defeat the staggered cron's jitter.
 4. yt-dlp's exit codes are counterintuitive: a no-URL update exits `0` both when it updated and when already current, and exits `100` from its _error_ handler (bad tag, network failure, unwritable binary). `CommandRunner.update/1` therefore treats **only `0`** as success.
 5. A settings change fires a one-shot `UpdateWorker.kickoff_apply/0` (`%{"apply_policy" => true}`), distinct from the recurring run.
 
