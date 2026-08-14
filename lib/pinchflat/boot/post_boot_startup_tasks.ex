@@ -7,6 +7,7 @@ defmodule Pinchflat.Boot.PostBootStartupTasks do
   Phoenix supervision tree.
   """
 
+  alias Pinchflat.Settings
   alias Pinchflat.YtDlp.UpdateWorker, as: YtDlpUpdateWorker
 
   # restart: :temporary means that this process will never be restarted (ie: will run once and then die)
@@ -40,7 +41,15 @@ defmodule Pinchflat.Boot.PostBootStartupTasks do
     {:ok, state}
   end
 
+  # Only re-assert held/pinned policies at boot. The staggered cron handles
+  # `stable` (and `nightly`) policy updates so a container restart doesn't
+  # defeat the jittered schedule by hammering the GitHub API at restart time.
+  @reasserted_at_boot ~w(pinned nightly_frozen nightly_until_stable)
+
   defp update_yt_dlp do
-    YtDlpUpdateWorker.kickoff()
+    case Settings.get!(:yt_dlp_update_policy) do
+      policy when policy in @reasserted_at_boot -> YtDlpUpdateWorker.kickoff()
+      _ -> :ok
+    end
   end
 end
