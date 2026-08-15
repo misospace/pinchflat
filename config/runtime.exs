@@ -1,6 +1,8 @@
 import Config
 require Logger
 
+alias Pinchflat.Boot.ConfigHelpers
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
@@ -42,7 +44,7 @@ config :pinchflat, Pinchflat.Repo,
 
 # Some users may want to increase the number of workers that use yt-dlp to improve speeds
 # Others may want to decrease the number of these workers to lessen the chance of an IP ban
-{yt_dlp_worker_count, _} = Integer.parse(System.get_env("YT_DLP_WORKER_CONCURRENCY", "2"))
+yt_dlp_worker_count = ConfigHelpers.safe_int_env("YT_DLP_WORKER_CONCURRENCY", 2)
 # Used to set the cron for the yt-dlp update worker. The reason for this is
 # to avoid all instances of PF updating yt-dlp at the same time, which 1)
 # could result in rate limiting and 2) gives me time to react if an update
@@ -113,7 +115,7 @@ if config_env() == :prod do
   # WAL lets readers run concurrently, so a larger pool mainly buys headroom for
   # the web UI / other jobs while a long op (reconcile, compaction) holds
   # connections. Bump this if you see "connection not available" under load.
-  {db_pool_size, _} = Integer.parse(System.get_env("DATABASE_POOL_SIZE", "10"))
+  db_pool_size = ConfigHelpers.safe_int_env("DATABASE_POOL_SIZE", 10)
 
   config :pinchflat, Pinchflat.Repo,
     database: db_path,
@@ -169,7 +171,7 @@ if config_env() == :prod do
       # See the documentation on https://hexdocs.pm/plug_cowboy/Plug.Cowboy.html
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
       ip: if(enable_ipv6, do: {0, 0, 0, 0, 0, 0, 0, 0}, else: {0, 0, 0, 0}),
-      port: String.to_integer(System.get_env("PORT") || "4000")
+      port: ConfigHelpers.safe_int_env("PORT", 4000)
     ],
     url: [path: base_route_path],
     secret_key_base: secret_key_base
