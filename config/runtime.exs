@@ -89,7 +89,10 @@ if config_env() == :prod do
   enable_ipv6 = String.length(System.get_env("ENABLE_IPV6", "")) > 0
   enable_prometheus = String.length(System.get_env("ENABLE_PROMETHEUS", "")) > 0
 
-  config :logger, level: String.to_existing_atom(System.get_env("LOG_LEVEL", "debug"))
+  default_log_level =
+    if System.get_env("RUN_CONTEXT") == "selfhosted", do: "info", else: "debug"
+
+  config :logger, level: String.to_existing_atom(System.get_env("LOG_LEVEL", default_log_level))
 
   config :pinchflat,
     yt_dlp_executable: System.find_executable("yt-dlp"),
