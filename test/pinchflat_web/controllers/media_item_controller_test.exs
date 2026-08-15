@@ -138,6 +138,13 @@ defmodule PinchflatWeb.MediaItemControllerTest do
       assert conn.status == 404
     end
 
+    test "returns 404 if the media item does not exist", %{conn: conn} do
+      conn = get(conn, ~p"/media/00000000-0000-0000-0000-000000000000/stream")
+
+      assert conn.status == 404
+      assert conn.resp_body == "Media item not found"
+    end
+
     test "returns 404 if the media item has no filepath", %{conn: conn} do
       media_item = media_item_fixture(%{media_filepath: nil})
       conn = get(conn, ~p"/media/#{media_item.uuid}/stream")
