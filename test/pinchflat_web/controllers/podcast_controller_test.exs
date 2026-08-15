@@ -45,6 +45,13 @@ defmodule PinchflatWeb.PodcastControllerTest do
       assert {"content-type", "application/rss+xml; charset=utf-8"} in conn.resp_headers
       assert {"content-disposition", "inline"} in conn.resp_headers
     end
+
+    test "returns 404 if the source does not exist", %{conn: conn} do
+      conn = get(conn, ~p"/sources/00000000-0000-0000-0000-000000000000/feed")
+
+      assert conn.status == 404
+      assert conn.resp_body == "Source not found"
+    end
   end
 
   describe "feed_image" do
@@ -66,6 +73,13 @@ defmodule PinchflatWeb.PodcastControllerTest do
       assert conn.status == 404
       assert conn.resp_body == "Image not found"
     end
+
+    test "returns 404 if the source does not exist", %{conn: conn} do
+      conn = get(conn, ~p"/sources/00000000-0000-0000-0000-000000000000/feed_image")
+
+      assert conn.status == 404
+      assert conn.resp_body == "Source not found"
+    end
   end
 
   describe "episode_image" do
@@ -86,6 +100,13 @@ defmodule PinchflatWeb.PodcastControllerTest do
 
       assert conn.status == 404
       assert conn.resp_body == "Image not found"
+    end
+
+    test "returns 404 if the media item does not exist", %{conn: conn} do
+      conn = get(conn, ~p"/media/00000000-0000-0000-0000-000000000000/episode_image")
+
+      assert conn.status == 404
+      assert conn.resp_body == "Media item not found"
     end
   end
 end

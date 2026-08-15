@@ -69,45 +69,49 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
   # Uses the UUID instead of the ID to avoid enumeration attacks
   # since streaming is a public endpoint (ie: no auth required)
   def stream(conn, %{"uuid" => uuid}) do
-    media_item = Repo.get_by!(MediaItem, uuid: uuid)
+    case Repo.get_by(MediaItem, uuid: uuid) do
+      nil ->
+        send_resp(conn, 404, "Media item not found")
 
-    if media_item.media_filepath && File.exists?(media_item.media_filepath) do
-      file_size = File.stat!(media_item.media_filepath).size
-      mime_type = MIME.from_path(media_item.media_filepath)
+      media_item ->
+        if media_item.media_filepath && File.exists?(media_item.media_filepath) do
+          file_size = File.stat!(media_item.media_filepath).size
+          mime_type = MIME.from_path(media_item.media_filepath)
 
-      case parse_range(conn, file_size) do
-        {:ok, {start_pos, end_pos}} ->
-          Logger.debug("Streaming media item: #{media_item.uuid} from #{start_pos} to #{end_pos}")
-          length = end_pos - start_pos + 1
+          case parse_range(conn, file_size) do
+            {:ok, {start_pos, end_pos}} ->
+              Logger.debug("Streaming media item: #{media_item.uuid} from #{start_pos} to #{end_pos}")
+              length = end_pos - start_pos + 1
 
-          conn
-          |> put_resp_content_type(mime_type)
-          |> put_resp_header("accept-ranges", "bytes")
-          |> put_resp_header("content-range", "bytes #{start_pos}-#{end_pos}/#{file_size}")
-          |> put_resp_header("content-length", to_string(length))
-          |> put_resp_header("content-disposition", "inline; filename=\"#{media_item.title}\"")
-          |> send_file(206, media_item.media_filepath, start_pos, length)
+              conn
+              |> put_resp_content_type(mime_type)
+              |> put_resp_header("accept-ranges", "bytes")
+              |> put_resp_header("content-range", "bytes #{start_pos}-#{end_pos}/#{file_size}")
+              |> put_resp_header("content-length", to_string(length))
+              |> put_resp_header("content-disposition", "inline; filename=\"#{media_item.title}\"")
+              |> send_file(206, media_item.media_filepath, start_pos, length)
 
-        {:error, :range_not_satisfiable} ->
-          Logger.debug("Range not satisfiable for media item: #{media_item.uuid}")
+            {:error, :range_not_satisfiable} ->
+              Logger.debug("Range not satisfiable for media item: #{media_item.uuid}")
 
-          conn
-          |> put_resp_header("content-range", "bytes */#{file_size}")
-          |> send_resp(416, "Range Not Satisfiable")
+              conn
+              |> put_resp_header("content-range", "bytes */#{file_size}")
+              |> send_resp(416, "Range Not Satisfiable")
 
-        {:error, :invalid_range} ->
-          Logger.debug("Invalid range request for media item: #{media_item.uuid} - serving full file")
+            {:error, :invalid_range} ->
+              Logger.debug("Invalid range request for media item: #{media_item.uuid} - serving full file")
 
-          conn
-          |> put_resp_content_type(mime_type)
-          |> put_resp_header("accept-ranges", "bytes")
-          |> put_resp_header("content-range", "bytes 0-#{file_size - 1}/#{file_size}")
-          |> put_resp_header("content-length", to_string(file_size))
-          |> put_resp_header("content-disposition", "inline; filename=\"#{media_item.title}\"")
-          |> send_file(200, media_item.media_filepath)
-      end
-    else
-      send_resp(conn, 404, "File not found")
+              conn
+              |> put_resp_content_type(mime_type)
+              |> put_resp_header("accept-ranges", "bytes")
+              |> put_resp_header("content-range", "bytes 0-#{file_size - 1}/#{file_size}")
+              |> put_resp_header("content-length", to_string(file_size))
+              |> put_resp_header("content-disposition", "inline; filename=\"#{media_item.title}\"")
+              |> send_file(200, media_item.media_filepath)
+          end
+        else
+          send_resp(conn, 404, "File not found")
+        end
     end
   end
 
