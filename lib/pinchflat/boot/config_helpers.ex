@@ -7,12 +7,19 @@ defmodule Pinchflat.Boot.ConfigHelpers do
   in the environment can never bring down the boot.
   """
 
+  require Logger
+
   @doc """
   Reads the environment variable named `name` and parses it as an integer.
 
   Returns `default` when the variable is unset, blank, or cannot be parsed as
   an integer. The default is also returned when the variable parses as a
   non-integer (e.g. `"1.5"`) or has trailing junk (e.g. `"12abc"`).
+
+  When the variable is set but cannot be parsed, a warning is logged naming
+  the variable, the rejected value, and the default being used. Nothing is
+  logged when the variable is unset or parses cleanly — an unset variable
+  is normal operation, not a misconfiguration.
 
   ## Examples
 
@@ -28,13 +35,17 @@ defmodule Pinchflat.Boot.ConfigHelpers do
       nil ->
         default
 
-      value when value in ["", " "] ->
-        default
-
       value ->
         case Integer.parse(value) do
-          {parsed, ""} -> parsed
-          _ -> default
+          {parsed, ""} ->
+            parsed
+
+          _ ->
+            Logger.warning(
+              "#{name}=#{inspect(value)} is not a valid integer; using default #{default}"
+            )
+
+            default
         end
     end
   end

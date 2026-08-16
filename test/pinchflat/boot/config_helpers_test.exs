@@ -1,6 +1,8 @@
 defmodule Pinchflat.Boot.ConfigHelpersTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias Pinchflat.Boot.ConfigHelpers
 
   @env_vars ["PINCHFLAT_TEST_SAFE_INT", "PINCHFLAT_TEST_EMPTY_INT", "PINCHFLAT_TEST_BAD_INT"]
@@ -76,6 +78,44 @@ defmodule Pinchflat.Boot.ConfigHelpersTest do
     test "requires a binary name and integer default" do
       assert_raise FunctionClauseError, fn -> ConfigHelpers.safe_int_env(:not_a_string, 10) end
       assert_raise FunctionClauseError, fn -> ConfigHelpers.safe_int_env("VAR", "10") end
+    end
+
+    test "logs a warning naming the variable, rejected value, and default when the env var is set but unparseable" do
+      System.put_env("PINCHFLAT_TEST_BAD_INT", "not-a-number")
+
+      log =
+        capture_log(fn ->
+          assert ConfigHelpers.safe_int_env("PINCHFLAT_TEST_BAD_INT", 10) == 10
+        end)
+
+      assert log =~ "[warning]"
+      assert log =~ "PINCHFLAT_TEST_BAD_INT"
+      assert log =~ "not-a-number"
+      assert log =~ "10"
+    end
+
+    test "stays silent when the env var is unset" do
+      System.delete_env("PINCHFLAT_TEST_BAD_INT")
+
+      log =
+        capture_log(fn ->
+          assert ConfigHelpers.safe_int_env("PINCHFLAT_TEST_BAD_INT", 10) == 10
+        end)
+
+      refute log =~ "PINCHFLAT_TEST_BAD_INT"
+      refute log =~ "using default"
+    end
+
+    test "stays silent when the env var parses cleanly" do
+      System.put_env("PINCHFLAT_TEST_SAFE_INT", "42")
+
+      log =
+        capture_log(fn ->
+          assert ConfigHelpers.safe_int_env("PINCHFLAT_TEST_SAFE_INT", 10) == 42
+        end)
+
+      refute log =~ "PINCHFLAT_TEST_SAFE_INT"
+      refute log =~ "using default"
     end
   end
 end
