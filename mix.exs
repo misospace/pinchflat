@@ -107,7 +107,19 @@ defmodule Pinchflat.MixProject do
     [
       check: "check --config=tooling/.check.exs",
       credo: "credo --config-file=tooling/.credo.exs",
-      setup: ["deps.get", "cmd ./tooling/fetch-sqlean.sh", "ecto.setup", "assets.setup", "assets.build"],
+      # JS deps must be installed before assets.setup/assets.build: the latter
+      # invokes esbuild, which resolves imports out of node_modules. CI installs
+      # both copies (root for tooling like prettier, assets/ for app code), so
+      # do the same here so `mix setup` works on a fresh clone.
+      setup: [
+        "deps.get",
+        "cmd yarn install",
+        ~s(cmd sh -c 'cd assets && yarn install'),
+        "cmd ./tooling/fetch-sqlean.sh",
+        "ecto.setup",
+        "assets.setup",
+        "assets.build"
+      ],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
