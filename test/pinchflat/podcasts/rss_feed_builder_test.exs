@@ -165,6 +165,18 @@ defmodule Pinchflat.Podcasts.RssFeedBuilderTest do
       refute String.contains?(item_xml, ~s(itunes:image))
       refute String.contains?(item_xml, ~s(podcast:images))
     end
+
+    test "does not allow description to break out of CDATA when it contains ]]>", %{source: source} do
+      description = "innocent]]><malicious>injected</malicious>"
+      _media_item = media_item_with_attachments(%{source_id: source.id, description: description})
+
+      res = RssFeedBuilder.build(source)
+      [_before, item_xml, _after] = String.split(res, ~r(</?item>))
+
+      # The internal ]]> must be split across two CDATA sections so the description
+      # cannot terminate the CDATA and expose the trailing content as XML.
+      assert String.contains?(item_xml, "<![CDATA[innocent]]]]><![CDATA[><malicious>injected</malicious>]]>")
+    end
   end
 
   defp format_date(date) do
