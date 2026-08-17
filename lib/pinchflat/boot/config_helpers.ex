@@ -41,9 +41,7 @@ defmodule Pinchflat.Boot.ConfigHelpers do
             parsed
 
           _ ->
-            Logger.warning(
-              "#{name}=#{inspect(value)} is not a valid integer; using default #{default}"
-            )
+            Logger.warning("#{name}=#{inspect(value)} is not a valid integer; using default #{default}")
 
             default
         end

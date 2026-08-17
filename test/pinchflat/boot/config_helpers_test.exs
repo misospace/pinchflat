@@ -83,14 +83,20 @@ defmodule Pinchflat.Boot.ConfigHelpersTest do
     test "logs a warning naming the variable, rejected value, and default when the env var is set but unparseable" do
       System.put_env("PINCHFLAT_TEST_BAD_INT", "not-a-number")
 
+      previous_log_level = Logger.level()
+
       log =
-        capture_log(fn ->
-          assert ConfigHelpers.safe_int_env("PINCHFLAT_TEST_BAD_INT", 10) == 10
-        end)
+        try do
+          Logger.configure(level: :debug)
+          capture_log(fn -> assert ConfigHelpers.safe_int_env("PINCHFLAT_TEST_BAD_INT", 10) == 10 end)
+        after
+          Logger.configure(level: previous_log_level)
+        end
 
       assert log =~ "[warning]"
       assert log =~ "PINCHFLAT_TEST_BAD_INT"
       assert log =~ "not-a-number"
+      assert log =~ "using default"
       assert log =~ "10"
     end
 
