@@ -4,6 +4,7 @@ defmodule Pinchflat.Tasks.ObanRescheduleHelperTest do
   use Pinchflat.DataCase
 
   import Pinchflat.SourcesFixtures
+  alias Pinchflat.Repo
   alias Pinchflat.Tasks.ObanRescheduleHelper
   alias Pinchflat.FastIndexing.FastIndexingWorker
 
@@ -12,10 +13,11 @@ defmodule Pinchflat.Tasks.ObanRescheduleHelperTest do
   end
 
   test "reschedule inserts a new job and returns {:ok, task}", %{source: source} do
-    Oban.drain()
-
-    assert {:ok, %Oban.Job{state: "scheduled", worker: "Elixir." <> _} = task} =
+    assert {:ok, %Pinchflat.Tasks.Task{job_id: job_id}} =
              ObanRescheduleHelper.reschedule(FastIndexingWorker, source, 60)
+
+    assert %Oban.Job{state: "scheduled", worker: "Pinchflat.FastIndexing.FastIndexingWorker"} =
+             Repo.get!(Oban.Job, job_id)
   end
 
   test "reschedule normalises :duplicate_job to {:ok, :job_exists}", %{source: source} do
@@ -34,15 +36,14 @@ defmodule Pinchflat.Tasks.ObanRescheduleHelperTest do
 
     assert {:ok, _task} = ObanRescheduleHelper.reschedule(FastIndexingWorker, source, 60)
 
-    Oban.cancel(existing)
+    Oban.cancel_job(existing)
   end
 
   test "reschedule forwards `next_run_in` seconds as Oban's schedule_in", %{source: source} do
-    Oban.drain()
-
-    {:ok, %Oban.Job{scheduled_at: scheduled_at}} =
+    {:ok, %Pinchflat.Tasks.Task{job_id: job_id}} =
       ObanRescheduleHelper.reschedule(FastIndexingWorker, source, 90)
 
+    %Oban.Job{scheduled_at: scheduled_at} = Repo.get!(Oban.Job, job_id)
     diff = DateTime.diff(scheduled_at, DateTime.utc_now(), :second)
 
     assert diff > 60 and diff <= 90
