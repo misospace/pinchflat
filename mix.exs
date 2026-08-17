@@ -110,7 +110,8 @@ defmodule Pinchflat.MixProject do
       # JS deps must be installed before assets.setup/assets.build: the latter
       # invokes esbuild, which resolves imports out of node_modules. CI installs
       # both copies (root for tooling like prettier, assets/ for app code), so
-      # do the same here so `mix setup` works on a fresh clone.
+      # do the same here so `mix setup` works on a fresh clone. The order
+      # matters: yarn install before ecto.setup, and both before assets.*.
       setup: [
         "deps.get",
         "cmd yarn install",
