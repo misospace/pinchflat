@@ -960,7 +960,8 @@ defmodule Pinchflat.SourcesTest do
 
       changeset = Sources.change_source(source, %{title_filter_regex: "(a+)+"})
 
-      assert "contains nested quantifiers" in errors_on(changeset).title_filter_regex
+      assert "contains nested quantifiers which can cause catastrophic backtracking (ReDoS)" in
+               errors_on(changeset).title_filter_regex
     end
   end
 
