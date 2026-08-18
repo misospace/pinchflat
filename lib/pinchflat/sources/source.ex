@@ -166,13 +166,29 @@ defmodule Pinchflat.Sources.Source do
   end
 
   defp validate_title_regex(%{changes: %{title_filter_regex: regex}} = changeset) when is_binary(regex) do
-    case Ecto.Adapters.SQL.query(Repo, "SELECT regexp_like('', ?)", [regex]) do
-      {:ok, _} -> changeset
-      _ -> add_error(changeset, :title_filter_regex, "is invalid")
+    if nested_quantifier?(regex) do
+      add_error(
+        changeset,
+        :title_filter_regex,
+        "contains nested quantifiers which can cause catastrophic backtracking (ReDoS)"
+      )
+    else
+      case Ecto.Adapters.SQL.query(Repo, "SELECT regexp_like('', ?)", [regex]) do
+        {:ok, _} -> changeset
+        _ -> add_error(changeset, :title_filter_regex, "is invalid")
+      end
     end
   end
 
   defp validate_title_regex(changeset), do: changeset
+
+  # Detects the classic catastrophic-backtracking shape: a group whose body
+  # contains a quantifier and which is itself followed by a quantifier
+  # (e.g. `(a+)+`, `(a*)*`, `(foo)+*`). These patterns can stall SQLite's
+  # `regexp_like` during indexing, so we reject them up front.
+  defp nested_quantifier?(regex) do
+    Regex.match?(~r/\([^()]*[*+?][^()]*\)[*+?]/, regex)
+  end
 
   defp validate_min_and_max_durations(changeset) do
     min_duration = get_change(changeset, :min_duration_seconds)

@@ -954,6 +954,14 @@ defmodule Pinchflat.SourcesTest do
 
       assert "is invalid" in errors_on(changeset).title_filter_regex
     end
+
+    test "fails when a regex with nested quantifiers is provided" do
+      source = source_fixture()
+
+      changeset = Sources.change_source(source, %{title_filter_regex: "(a+)+"})
+
+      assert "contains nested quantifiers which can cause catastrophic backtracking (ReDoS)" in errors_on(changeset).title_filter_regex
+    end
   end
 
   describe "change_source/3 when testing min/max duration validations" do
