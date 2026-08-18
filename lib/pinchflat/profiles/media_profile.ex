@@ -85,6 +85,7 @@ defmodule Pinchflat.Profiles.MediaProfile do
     # Ensures it ends with `.{{ ext }}` or `.%(ext)s` or similar (with a little wiggle room)
     |> validate_format(:output_path_template, ext_regex(), message: "must end with .{{ ext }}")
     |> validate_series_root_marker(:output_path_template)
+    |> validate_no_directory_traversal(:output_path_template)
     |> validate_number(:redownload_delay_days, greater_than_or_equal_to: 0)
     |> unique_constraint(:name)
   end
@@ -127,6 +128,30 @@ defmodule Pinchflat.Profiles.MediaProfile do
 
         true ->
           []
+      end
+    end)
+  end
+
+  @doc """
+  Rejects output-path templates that contain `..` segments. Even though
+  templates are Liquid-rendered later, a stray `..` makes the resolved
+  path escape the configured media directory and lets FileSyncing /
+  `Media.delete_media_files` act on paths outside of it.
+
+  Returns %Ecto.Changeset{}
+  """
+  def validate_no_directory_traversal(changeset, field) do
+    validate_change(changeset, field, fn ^field, template ->
+      segments =
+        template
+        |> to_string()
+        |> String.split("/")
+        |> Enum.map(&String.trim/1)
+
+      if Enum.any?(segments, &(&1 == "..")) do
+        [{field, "must not contain '..' segments that escape the media directory"}]
+      else
+        []
       end
     end)
   end
