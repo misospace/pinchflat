@@ -1,29 +1,46 @@
 defmodule Pinchflat.HTTP.HTTPClient do
   @moduledoc """
-  This module provides a simple interface for making HTTP requests.
+  This module is a thin wrapper around Erlang's `:httpc` so consumers can
+  configure it once and tests can swap it out via `Mox`. It also enforces
+  sane default connect and request timeouts so a stalled upstream host
+  cannot hang a queue worker indefinitely.
 
-  Made to be easily swappable with other HTTP clients. If you need more complexity
-  or security, check out HTTPoison or Mint.
+  Defaults can be overridden in Application config under
+  `:pinchflat, Pinchflat.HTTP.HTTPClient`:
+
+      config :pinchflat, Pinchflat.HTTP.HTTPClient,
+        connect_timeout: 5_000,
+        request_timeout: 15_000
   """
+
+  @behaviour Pinchflat.HTTP.HTTPBehaviour
 
   alias Pinchflat.HTTP.HTTPBehaviour
 
-  @behaviour HTTPBehaviour
+  # `:httpc` defaults both `timeout` and `connect_timeout` to `:infinity`,
+  # which means a stalled upstream can pin a worker forever. We override
+  # both so the call fails fast instead.
+  @default_request_timeout 15_000
+  @default_connect_timeout 5_000
 
   @doc """
-  Makes a GET request to the given URL and returns the response.
-
-  NOTE: I can't really test this with Mox and I can't think of a way to test this
-  that isn't ultimately redundant. I'm just going to leave it untested for now and
-  focus more on testing the consumers of this module.
-
-  Returns {:ok, String.t()} | {:error, String.t()}
+  Performs a GET request against `url`. Returns `{:ok, body}` on a
+  successful response (status 200..299) or `{:error, reason}` otherwise.
   """
   @impl HTTPBehaviour
-  def get(url, headers \\ [], opts \\ []) do
-    headers = parse_headers(headers)
+  def get(url), do: get(url, [], [])
 
-    case :httpc.request(:get, {url, headers}, [], opts) do
+  @impl HTTPBehaviour
+  def get(url, headers), do: get(url, headers, [])
+
+  @impl HTTPBehaviour
+  def get(url, headers, opts) do
+    headers = parse_headers(headers)
+    http_opts = [timeout: request_timeout(), connect_timeout: connect_timeout()]
+
+    :inets.start()
+
+    case :httpc.request(:get, {url, headers}, http_opts, opts) do
       {:ok, {{_version, 200, _reason_phrase}, _headers, body}} ->
         {:ok, to_string(body)}
 
@@ -31,11 +48,26 @@ defmodule Pinchflat.HTTP.HTTPClient do
         {:error, "HTTP request failed with status code #{status_code}: #{reason_phrase}"}
 
       {:error, reason} ->
-        {:error, "HTTP request failed: #{reason}"}
+        {:error, "HTTP request failed: #{inspect(reason)}"}
     end
   end
 
   defp parse_headers(headers) do
-    Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
+    Enum.map(headers, fn {k, v} -> {to_charlist_safe(k), to_charlist_safe(v)} end)
+  end
+
+  defp to_charlist_safe(value) when is_binary(value), do: to_charlist(value)
+  defp to_charlist_safe(value) when is_list(value), do: value
+
+  defp request_timeout do
+    :pinchflat
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:request_timeout, @default_request_timeout)
+  end
+
+  defp connect_timeout do
+    :pinchflat
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:connect_timeout, @default_connect_timeout)
   end
 end
