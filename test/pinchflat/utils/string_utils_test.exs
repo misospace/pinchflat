@@ -28,6 +28,31 @@ defmodule Pinchflat.Utils.StringUtilsTest do
     end
   end
 
+  describe "to_content_disposition_filename/1" do
+    test "returns a plain title unchanged" do
+      assert StringUtils.to_content_disposition_filename("My Podcast") == "My Podcast"
+    end
+
+    test "escapes double quotes" do
+      assert StringUtils.to_content_disposition_filename("A \"quoted\" title") == "A \\\"quoted\\\" title"
+    end
+
+    test "escapes backslashes" do
+      assert StringUtils.to_content_disposition_filename("a\\b") == "a\\\\b"
+    end
+
+    test "percent-encodes control characters" do
+      assert StringUtils.to_content_disposition_filename("line1\r\nline2") == "line1%0D%0Aline2"
+      assert StringUtils.to_content_disposition_filename("tab\there") == "tab%09here"
+      assert StringUtils.to_content_disposition_filename("del\x7Fhere") == "del%7Fhere"
+    end
+
+    test "handles a mix of quotes, backslashes and control characters" do
+      assert StringUtils.to_content_disposition_filename("A \"quoted\" \\ title\r\nX-Injected: 1") ==
+               "A \\\"quoted\\\" \\\\ title%0D%0AX-Injected: 1"
+    end
+  end
+
   describe "double_brace/1" do
     test "wraps a string in double braces" do
       assert StringUtils.double_brace("hello") == "{{ hello }}"
