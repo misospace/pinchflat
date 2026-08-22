@@ -217,6 +217,18 @@ defmodule PinchflatWeb.PlugsTest do
       assert conn.resp_body == "Unauthorized"
     end
 
+    test "does not allow access when the route token has the same length but different bytes", %{conn: conn} do
+      route_token = Settings.get!(:route_token)
+      # Same length as the configured token, but a different byte at the end.
+      wrong_token = String.replace_trailing(route_token, String.last(route_token), "x")
+      conn = %{conn | query_params: %{"route_token" => wrong_token}}
+
+      conn = Plugs.token_protected_route(conn, [])
+
+      assert conn.status == 401
+      assert conn.resp_body == "Unauthorized"
+    end
+
     test "does not allow access when the route token is missing", %{conn: conn} do
       conn = %{conn | query_params: %{}}
 
