@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.4.4](https://github.com/misospace/pinchflat/compare/v1.4.3...v1.4.4) (2026-08-22)
+
+
+### Bug Fixes
+
+* 11: Harden default SECRET_KEY_BASE for self-hosted prod ([08865c1](https://github.com/misospace/pinchflat/commit/08865c10cb5b1d28718754bb751aa949b614560c))
+* 18: repair ObanRescheduleHelper tests ([#41](https://github.com/misospace/pinchflat/issues/41)) ([2cdb413](https://github.com/misospace/pinchflat/commit/2cdb4139afd9ce299ee3da20bfbdc1b367c7957c))
+* make feed-route header scoping pass the CI gate ([138572f](https://github.com/misospace/pinchflat/commit/138572f7e8e0bdf03cb826905bcb5fb28604bca6))
+* **test:** rebase all /app paths, not just /app/test ([edf5fe4](https://github.com/misospace/pinchflat/commit/edf5fe46c75286e84de57d187655127b8b4599f8))
+* **test:** stop hardcoding the /app checkout path ([e3a8081](https://github.com/misospace/pinchflat/commit/e3a80810413fb5c829e09b59b7da251fb522f5cd))
+* **test:** stop hardcoding the /app checkout path in fixtures ([6a0140a](https://github.com/misospace/pinchflat/commit/6a0140a8d0badf0ff6f822e36a87d5d21c824ec8))
+* **web:** compare route token in constant time ([#51](https://github.com/misospace/pinchflat/issues/51)) ([0f4df5e](https://github.com/misospace/pinchflat/commit/0f4df5e4e9125204bed01abc6799d143530d207b)), closes [#47](https://github.com/misospace/pinchflat/issues/47)
+
+
+### Chores
+
+* add CODEOWNERS ([12f27ec](https://github.com/misospace/pinchflat/commit/12f27ec0b3f88c424d6c3c0243668510d7185a03))
+* **ci:** add mix deps.audit to the mix check gate ([fffde16](https://github.com/misospace/pinchflat/commit/fffde168ca900416bf917c7c4d4d52374086e9b7))
+* nudge workflow registration ([6454d67](https://github.com/misospace/pinchflat/commit/6454d67d851d64c574845ee6402679bfa621b991))
+* rehome to misospace namespace ([81a7e4f](https://github.com/misospace/pinchflat/commit/81a7e4f2552011497eb76e1ceed090174d184192))
+
+
+### Documentation
+
+* consolidate CLAUDE.md into a single AGENTS.md ([a53b6a6](https://github.com/misospace/pinchflat/commit/a53b6a68c949259faec0acd05b20380affbd63a2))
+* consolidate CLAUDE.md into a single AGENTS.md ([b12befc](https://github.com/misospace/pinchflat/commit/b12befc45187bfece9241d7e332e2a8718cb451c))
+* issue contract for the autonomous loop ([1d5c09f](https://github.com/misospace/pinchflat/commit/1d5c09f250d82d328537c7f87138473edae5cb05))
+* issue contract for the autonomous loop (template + AGENTS.md) ([cce814c](https://github.com/misospace/pinchflat/commit/cce814c87b0f71a60fc0908a92b261f1ae88e1b6))
+* preserve upstream rollback script for migrating back to original pinchflat ([00836aa](https://github.com/misospace/pinchflat/commit/00836aa8a2b3ea15a6e0c267d55a5a8f3179331f))
+
+
+### Styles
+
+* format media.ex per .formatter.exs ([40511d5](https://github.com/misospace/pinchflat/commit/40511d591cb535184b498f3169b7792117ac90cf))
+* format media.ex per .formatter.exs ([591ab24](https://github.com/misospace/pinchflat/commit/591ab24e498a50200162dfba8eb82a89763e2a0a))
+* prettier-format agent-task.yml and AGENTS.md ([f710026](https://github.com/misospace/pinchflat/commit/f7100268e0263fe07b9d05d82aef9b79f0145372))
+
 ## [1.4.3](https://github.com/CommunityMaintained/pinchflat/compare/v1.4.2...v1.4.3) (2026-08-02)
 
 
