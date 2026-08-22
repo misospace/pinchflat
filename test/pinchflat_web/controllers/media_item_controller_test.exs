@@ -167,6 +167,19 @@ defmodule PinchflatWeb.MediaItemControllerTest do
 
       assert {"content-length", to_string(filesize)} in conn.resp_headers
     end
+
+    test "escapes the title in the content-disposition header", %{conn: conn} do
+      media_item = media_item_with_attachments(%{title: "A \"quoted\" \\ title\r\nX-Injected: 1"})
+
+      conn = get(conn, ~p"/media/#{media_item.uuid}/stream")
+
+      assert {
+               "content-disposition",
+               "inline; filename=\"A \\\"quoted\\\" \\\\ title%0D%0AX-Injected: 1\""
+             } in conn.resp_headers
+
+      assert Enum.count(conn.resp_headers, fn {name, _} -> name == "content-disposition" end) == 1
+    end
   end
 
   describe "streaming media when range is valid" do

@@ -26,6 +26,25 @@ defmodule Pinchflat.Utils.StringUtils do
   end
 
   @doc """
+  Escapes a string for use as a quoted-string filename in a
+  `Content-Disposition` header (RFC 6266). Backslashes and double quotes are
+  escaped and control characters (including CR/LF) are percent-encoded so the
+  header value remains a single, well-formed line.
+
+  Returns binary()
+  """
+  def to_content_disposition_filename(string) when is_binary(string) do
+    string
+    |> String.replace(~r/[\x00-\x1F\x7F]/, &percent_encode_char/1)
+    |> String.replace("\\", "\\\\")
+    |> String.replace("\"", "\\\"")
+  end
+
+  defp percent_encode_char(<<codepoint>>) do
+    "%" <> String.upcase(String.pad_leading(Integer.to_string(codepoint, 16), 2, "0"))
+  end
+
+  @doc """
   Wraps a string in double braces. Useful as a UI helper now that
   LiveView 1.0.0 allows `{}` for interpolation so now we can't use braces
   directly in the view.
