@@ -174,9 +174,9 @@ defmodule PinchflatWeb.MediaItemControllerTest do
       conn = get(conn, ~p"/media/#{media_item.uuid}/stream")
 
       assert {
-        "content-disposition",
-        "inline; filename=\"A \\\"quoted\\\" \\\\ title%0D%0AX-Injected: 1\""
-      } in conn.resp_headers
+               "content-disposition",
+               "inline; filename=\"A \\\"quoted\\\" \\\\ title%0D%0AX-Injected: 1\""
+             } in conn.resp_headers
 
       assert Enum.count(conn.resp_headers, fn {name, _} -> name == "content-disposition" end) == 1
     end
