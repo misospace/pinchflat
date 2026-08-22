@@ -55,9 +55,12 @@ defmodule PinchflatWeb.Plugs do
   @doc """
   If the `route_token` query parameter matches the `route_token` setting, this plug does nothing.
   Otherwise, it sends a 401 response.
+
+  The comparison is done in constant time via `Plug.Crypto.secure_compare/2` so that response
+  timing does not reveal how many leading bytes of the token matched.
   """
   def token_protected_route(%{query_params: %{"route_token" => route_token}} = conn, _opts) do
-    if Settings.get!(:route_token) == route_token do
+    if Plug.Crypto.secure_compare(Settings.get!(:route_token), route_token) do
       conn
     else
       send_unauthorized(conn)
