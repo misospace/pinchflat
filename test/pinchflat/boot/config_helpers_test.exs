@@ -203,6 +203,7 @@ defmodule Pinchflat.Boot.ConfigHelpersTest do
       log =
         try do
           Logger.configure(level: :debug)
+
           capture_log(fn ->
             assert ConfigHelpers.resolve_secret_key_base(String.duplicate("e", 43), path) == existing
           end)
