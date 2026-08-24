@@ -124,4 +124,109 @@ defmodule Pinchflat.Boot.ConfigHelpersTest do
       refute log =~ "using default"
     end
   end
+
+  describe "resolve_secret_key_base/2" do
+    setup do
+      dir = Path.join(System.tmp_dir!(), "pinchflat-secret-test-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+
+      on_exit(fn -> File.rm_rf!(dir) end)
+
+      {:ok, path: Path.join(dir, ".secret_key_base")}
+    end
+
+    test "persists a fresh secret of at least 64 bytes when no file exists", %{path: path} do
+      secret = ConfigHelpers.resolve_secret_key_base(nil, path)
+
+      assert byte_size(secret) >= 64
+      assert File.read!(path) == secret
+    end
+
+    test "generates distinct secrets on repeated fresh installs", %{path: path} do
+      first = ConfigHelpers.resolve_secret_key_base(nil, path)
+      File.rm!(path)
+      second = ConfigHelpers.resolve_secret_key_base(nil, path)
+
+      assert first != second
+    end
+
+    test "returns the persisted secret unchanged when it is at least 64 bytes", %{path: path} do
+      existing = String.duplicate("a", 64)
+      File.write!(path, existing)
+
+      assert ConfigHelpers.resolve_secret_key_base(nil, path) == existing
+      assert File.read!(path) == existing
+    end
+
+    test "regenerates and rewrites an existing short persisted secret", %{path: path} do
+      # 43 characters: the value produced by the pre-1.4.5 32-byte generator.
+      short = String.duplicate("b", 43)
+      File.write!(path, short)
+
+      previous_log_level = Logger.level()
+
+      log =
+        try do
+          Logger.configure(level: :debug)
+          capture_log(fn -> ConfigHelpers.resolve_secret_key_base(nil, path) end)
+        after
+          Logger.configure(level: previous_log_level)
+        end
+
+      assert log =~ "Regenerating"
+      secret = File.read!(path)
+      assert byte_size(secret) >= 64
+      refute secret == short
+      assert ConfigHelpers.resolve_secret_key_base(nil, path) == secret
+    end
+
+    test "trims a trailing newline from a valid persisted secret", %{path: path} do
+      existing = String.duplicate("g", 64)
+      File.write!(path, existing <> "\n")
+
+      assert ConfigHelpers.resolve_secret_key_base(nil, path) == existing
+    end
+
+    test "returns an explicitly supplied env secret of at least 64 bytes as-is", %{path: path} do
+      supplied = String.duplicate("c", 80)
+
+      assert ConfigHelpers.resolve_secret_key_base(supplied, path) == supplied
+      refute File.exists?(path)
+    end
+
+    test "falls back to the persisted secret when the env secret is too short", %{path: path} do
+      existing = String.duplicate("d", 64)
+      File.write!(path, existing)
+
+      previous_log_level = Logger.level()
+
+      log =
+        try do
+          Logger.configure(level: :debug)
+          capture_log(fn ->
+            assert ConfigHelpers.resolve_secret_key_base(String.duplicate("e", 43), path) == existing
+          end)
+        after
+          Logger.configure(level: previous_log_level)
+        end
+
+      assert log =~ "SECRET_KEY_BASE is 43 bytes"
+      assert File.read!(path) == existing
+    end
+
+    test "generates a persisted secret when the env secret is too short and no file exists", %{path: path} do
+      ConfigHelpers.resolve_secret_key_base(String.duplicate("f", 43), path)
+
+      secret = File.read!(path)
+      assert byte_size(secret) >= 64
+      assert ConfigHelpers.resolve_secret_key_base(String.duplicate("f", 43), path) == secret
+    end
+
+    test "is stable across restarts: a second call returns the same secret", %{path: path} do
+      first = ConfigHelpers.resolve_secret_key_base(nil, path)
+      second = ConfigHelpers.resolve_secret_key_base(nil, path)
+
+      assert first == second
+    end
+  end
 end

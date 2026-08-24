@@ -130,32 +130,17 @@ if config_env() == :prod do
   # to check this value into version control, so we use an environment
   # variable instead.
   secret_key_base =
-    if System.get_env("SECRET_KEY_BASE") do
-      System.get_env("SECRET_KEY_BASE")
+    if System.get_env("RUN_CONTEXT") == "selfhosted" do
+      # Auto-generate and persist a unique key in the config directory on first boot.
+      # This avoids the risk of a hardcoded default being shared across all installs.
+      # The value is always at least 64 bytes, as required by Plug's cookie store,
+      # and an existing too-short persisted key is regenerated on boot.
+      secret_key_path = Path.join(config_path, ".secret_key_base")
+
+      ConfigHelpers.resolve_secret_key_base(System.get_env("SECRET_KEY_BASE"), secret_key_path)
     else
-      if System.get_env("RUN_CONTEXT") == "selfhosted" do
-        # Auto-generate and persist a unique key in the config directory on first boot.
-        # This avoids the risk of a hardcoded default being shared across all installs.
-        secret_key_path = Path.join(config_path, ".secret_key_base")
-
-        secret_key_base =
-          case File.read(secret_key_path) do
-            {:ok, key} ->
-              String.trim(key)
-
-            _ ->
-              generated = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
-              File.write!(secret_key_path, generated <> "\n")
-
-              Logger.warning(
-                "Generated new SECRET_KEY_BASE at #{secret_key_path}. " <>
-                  "If you want to rotate it, delete the file and restart."
-              )
-
-              generated
-          end
-
-        secret_key_base
+      if System.get_env("SECRET_KEY_BASE") do
+        System.get_env("SECRET_KEY_BASE")
       else
         raise """
         environment variable SECRET_KEY_BASE is missing.
