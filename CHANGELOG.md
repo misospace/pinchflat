@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.5](https://github.com/misospace/pinchflat/compare/v1.4.4...v1.4.5) (2026-08-25)
+
+
+### Bug Fixes
+
+* **config:** generate Plug-compatible 64-byte self-hosted secret keys ([#54](https://github.com/misospace/pinchflat/issues/54)) ([165879a](https://github.com/misospace/pinchflat/commit/165879a86af852197c608c0ad7d534ffee82f75b))
+
 ## [1.4.4](https://github.com/misospace/pinchflat/compare/v1.4.3...v1.4.4) (2026-08-22)
 
 
