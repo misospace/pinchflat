@@ -42,6 +42,7 @@ defmodule Pinchflat.HTTP.HTTPClient do
   @impl HTTPBehaviour
   def get(url, headers, opts) do
     headers = parse_headers(headers)
+
     http_opts = [
       timeout: request_timeout(),
       connect_timeout: connect_timeout(),

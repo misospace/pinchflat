@@ -93,10 +93,13 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
   describe "max_body_length" do
     test "returns an error tuple when the upstream response body exceeds the configured max_body_length" do
       # Cap the body at 1 KiB so the oversized response below trips the limit
-      # without allocating anything large in the test process.
+      # without allocating anything large in the test process. The body sent
+      # by the listener is several times larger than the cap and uses chunked
+      # transfer encoding so :httpc must abort mid-stream regardless of its
+      # internal buffering.
       Application.put_env(:pinchflat, HTTPClient, max_body_length: 1_024)
 
-      {port, cleanup} = start_oversize_listener!(2_048)
+      {port, cleanup} = start_oversize_listener!(8_192)
 
       try do
         url = "http://127.0.0.1:#{port}/"
@@ -167,9 +170,21 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
 
         body = :binary.copy(<<"A">>, body_size)
 
+        chunk_size = 1_024
+        chunk_count = div(body_size, chunk_size)
+
+        chunks =
+          for i <- 0..(chunk_count - 1) do
+            chunk = :binary.part(body, i * chunk_size, chunk_size)
+            Integer.to_string(chunk_size, 16) <> "\r\n" <> chunk <> "\r\n"
+          end
+
+        trailer = "0\r\n\r\n"
+
         :gen_tcp.send(
           socket,
-          "HTTP/1.1 200 OK\r\nContent-Length: " <> Integer.to_string(body_size) <> "\r\n\r\n" <> body
+          "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" <>
+            Enum.join(chunks) <> trailer
         )
 
         :gen_tcp.close(socket)
