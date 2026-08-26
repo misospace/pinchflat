@@ -90,6 +90,30 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
     end
   end
 
+  describe "max_body_length" do
+    test "returns an error tuple when the upstream response body exceeds the configured max_body_length" do
+      # Cap the body at 1 KiB so the oversized response below trips the limit
+      # without allocating anything large in the test process.
+      Application.put_env(:pinchflat, HTTPClient, max_body_length: 1_024)
+
+      {port, cleanup} = start_oversize_listener!(2_048)
+
+      try do
+        url = "http://127.0.0.1:#{port}/"
+
+        assert {result, _elapsed_ms} =
+                 run_within(5_000, fn ->
+                   HTTPClient.get(url, [], [])
+                 end)
+
+        assert match?({:error, _reason}, result),
+               "expected HTTPClient.get/3 to return {:error, _} for an oversized body, got: #{inspect(result)}"
+      after
+        cleanup.()
+      end
+    end
+  end
+
   # --- helpers ---------------------------------------------------------------
 
   # Starts a TCP listener on a free port and returns `{port, cleanup}` where
@@ -126,6 +150,40 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
       {:error, :closed} ->
         :ok
     end
+  end
+
+  # Starts a TCP listener on a free port that replies to the first request
+  # with a `200 OK` whose body is `body_size` bytes. Returns `{port, cleanup}`.
+  defp start_oversize_listener!(body_size) do
+    {:ok, listen_socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(listen_socket)
+
+    pid =
+      spawn(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        :gen_tcp.recv(socket, 0, 5_000)
+
+        body = :binary.copy(<<"A">>, body_size)
+
+        :gen_tcp.send(
+          socket,
+          "HTTP/1.1 200 OK\r\nContent-Length: " <> Integer.to_string(body_size) <> "\r\n\r\n" <> body
+        )
+
+        :gen_tcp.close(socket)
+      end)
+
+    cleanup = fn ->
+      :gen_tcp.close(listen_socket)
+
+      if Process.alive?(pid) do
+        Process.exit(pid, :kill)
+      end
+    end
+
+    {port, cleanup}
   end
 
   defp listen_and_close! do

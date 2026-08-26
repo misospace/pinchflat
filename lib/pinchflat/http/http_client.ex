@@ -23,6 +23,12 @@ defmodule Pinchflat.HTTP.HTTPClient do
   @default_request_timeout 15_000
   @default_connect_timeout 5_000
 
+  # `:httpc` buffers the entire response body in memory with no size cap by
+  # default, so an unexpectedly large upstream response can exhaust worker
+  # memory. Our consumers only fetch small payloads (RSS feeds, a single
+  # API page, one release JSON), so a few MB is ample.
+  @default_max_body_length 5_000_000
+
   @doc """
   Performs a GET request against `url`. Returns `{:ok, body}` on a
   successful response (status 200..299) or `{:error, reason}` otherwise.
@@ -36,7 +42,11 @@ defmodule Pinchflat.HTTP.HTTPClient do
   @impl HTTPBehaviour
   def get(url, headers, opts) do
     headers = parse_headers(headers)
-    http_opts = [timeout: request_timeout(), connect_timeout: connect_timeout()]
+    http_opts = [
+      timeout: request_timeout(),
+      connect_timeout: connect_timeout(),
+      max_body_length: max_body_length()
+    ]
 
     :inets.start()
 
@@ -69,5 +79,11 @@ defmodule Pinchflat.HTTP.HTTPClient do
     :pinchflat
     |> Application.get_env(__MODULE__, [])
     |> Keyword.get(:connect_timeout, @default_connect_timeout)
+  end
+
+  defp max_body_length do
+    :pinchflat
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:max_body_length, @default_max_body_length)
   end
 end
