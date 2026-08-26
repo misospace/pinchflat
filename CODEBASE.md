@@ -79,15 +79,15 @@
 
 ### Elixir Libraries (notable)
 
-| Library      | Role                                                     |
-| ------------ | -------------------------------------------------------- |
-| NimbleParsec | Parser combinators — used to parse yt-dlp output formats |
-| Timex        | Date/time utilities                                      |
-| Jason        | JSON encoding/decoding                                   |
-| Gettext      | i18n — English error strings in `priv/gettext/`          |
-| Finch        | HTTP client (used by Swoosh and internal HTTP calls)     |
-| `:httpc` / `:inets` | Erlang's built-in HTTP client — used by `Pinchflat.HTTP.HTTPClient` to fetch RSS feeds, YouTube Data API pages, and GitHub release JSON; bounded by `max_body_length` (overridable via `Application.get_env(:pinchflat, HTTPClient, :max_body_length)`) to keep Oban workers from buffering unexpectedly large responses |
-| Swoosh       | Email library (wired up but not a primary feature)       |
+| Library             | Role                                                                                                                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NimbleParsec        | Parser combinators — used to parse yt-dlp output formats                                                                                                                                                                            |
+| Timex               | Date/time utilities                                                                                                                                                                                                                 |
+| Jason               | JSON encoding/decoding                                                                                                                                                                                                              |
+| Gettext             | i18n — English error strings in `priv/gettext/`                                                                                                                                                                                     |
+| Finch               | HTTP client (used by Swoosh and internal HTTP calls)                                                                                                                                                                                |
+| `:httpc` / `:inets` | Erlang's built-in HTTP client — used by `Pinchflat.HTTP.HTTPClient` to fetch RSS feeds, YouTube Data API pages, and GitHub release JSON; responses are streamed and aborted when the configurable `max_body_length` cap is exceeded |
+| Swoosh              | Email library (wired up but not a primary feature)                                                                                                                                                                                  |
 
 ### Code Quality & Testing
 

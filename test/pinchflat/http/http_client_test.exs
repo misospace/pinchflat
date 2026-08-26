@@ -97,7 +97,11 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
       # by the listener is several times larger than the cap and uses chunked
       # transfer encoding so :httpc must abort mid-stream regardless of its
       # internal buffering.
-      Application.put_env(:pinchflat, HTTPClient, max_body_length: 1_024)
+      Application.put_env(
+        :pinchflat,
+        HTTPClient,
+        Keyword.merge(Application.get_env(:pinchflat, HTTPClient, []), max_body_length: 1_024)
+      )
 
       {port, cleanup} = start_oversize_listener!(8_192)
 
@@ -109,8 +113,7 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
                    HTTPClient.get(url, [], [])
                  end)
 
-        assert match?({:error, _reason}, result),
-               "expected HTTPClient.get/3 to return {:error, _} for an oversized body, got: #{inspect(result)}"
+        assert {:error, "HTTP response body exceeded max_body_length of 1024 bytes"} = result
       after
         cleanup.()
       end
