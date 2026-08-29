@@ -1,10 +1,9 @@
 ---
 name: Release Image
 
-# Dispatch-only publisher for this snapshot repo: builds the selfhosted image
-# at the given ref and pushes ghcr.io/misospace/pinchflat:<version.txt> +
-# latest. release-please's docker job only fires on releases it creates, which
-# a frozen snapshot never has.
+# Publisher for this snapshot repo: builds the selfhosted image and pushes
+# ghcr.io/misospace/pinchflat:<version.txt> + latest. It runs automatically
+# after the shared CI base image succeeds, or manually for an explicit ref.
 #
 # Each platform builds on a runner of its own architecture and pushes by digest;
 # the merge job assembles the manifest list. Emulating arm64 through QEMU on an
@@ -19,13 +18,25 @@ on:
         description: 'Branch, tag, or SHA to build'
         required: false
         default: 'main'
+  workflow_run:
+    workflows: ['CI Base Image']
+    types: [completed]
+
+concurrency:
+  group: release-image
+  cancel-in-progress: false
 
 env:
-  CI_BASE_IMAGE: ghcr.io/misospace/pinchflat-ci-base:latest
+  CI_BASE_IMAGE_REPO: ghcr.io/misospace/pinchflat-ci-base
 
 jobs:
   build:
     name: Build (${{ matrix.platform }})
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ${{ startsWith(matrix.platform, 'linux/arm') && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
@@ -37,19 +48,29 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ inputs.ref }}
-          persist-credentials: false
-
       - name: Prepare
         id: prep
         run: |
-          echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
-          echo "arch=${MATRIX_PLATFORM##*/}" >> $GITHUB_OUTPUT
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            echo "checkout_ref=$WORKFLOW_RUN_SHA" >> "$GITHUB_OUTPUT"
+            echo "ci_base_image=${CI_BASE_IMAGE_REPO}:sha-${WORKFLOW_RUN_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          else
+            echo "checkout_ref=${INPUT_REF:-main}" >> "$GITHUB_OUTPUT"
+            echo "ci_base_image=${CI_BASE_IMAGE_REPO}:latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "repo=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "arch=${MATRIX_PLATFORM##*/}" >> "$GITHUB_OUTPUT"
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_REF: ${{ inputs.ref }}
           MATRIX_PLATFORM: ${{ matrix.platform }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.prep.outputs.checkout_ref }}
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -68,7 +89,7 @@ jobs:
           context: .
           file: ./docker/selfhosted.Dockerfile
           platforms: ${{ matrix.platform }}
-          build-args: CI_BASE_IMAGE=${{ env.CI_BASE_IMAGE }}
+          build-args: CI_BASE_IMAGE=${{ steps.prep.outputs.ci_base_image }}
           outputs: type=image,name=ghcr.io/${{ steps.prep.outputs.repo }},push-by-digest=true,name-canonical=true,push=true
           # Scoped per arch: a shared scope makes the two concurrent jobs evict
           # each other's layers, which costs more than it saves.
@@ -93,15 +114,33 @@ jobs:
   merge:
     name: Merge and Push Manifest
     runs-on: ubuntu-24.04
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     needs: build
     permissions:
       contents: read
       packages: write
     steps:
+      - name: Prepare
+        id: prep
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            echo "checkout_ref=$WORKFLOW_RUN_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "checkout_ref=${INPUT_REF:-main}" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_REF: ${{ inputs.ref }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ steps.prep.outputs.checkout_ref }}
           persist-credentials: false
 
       - name: Get version and lowercase repo
@@ -116,6 +155,8 @@ jobs:
         with:
           images: |
             ghcr.io/${{ steps.meta.outputs.repo }}
+          # The version tag intentionally moves for toolchain-only refreshes;
+          # consumers pin the resulting manifest digest.
           tags: |
             type=raw,value=${{ steps.meta.outputs.version }}
             type=raw,value=latest

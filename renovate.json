@@ -68,6 +68,12 @@
       "description": "Bump Elixir, OTP, and the Debian snapshot together so they land on a published hexpm/elixir combo",
       "matchPackageNames": ["hexpm/elixir"],
       "groupName": "Elixir/OTP/Debian base image (hexpm/elixir)"
+    },
+    {
+      "description": "Keep yt-dlp updates out of application releases",
+      "matchPackageNames": ["yt-dlp/yt-dlp"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "yt-dlp"
     }
   ]
 }
