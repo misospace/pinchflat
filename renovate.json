@@ -13,13 +13,13 @@
     "erlang": "28.5.0.4"
   },
   "pip_requirements": {
-    "managerFilePatterns": ["/(^|/)ci-base\\.requirements\\.txt$/"]
+    "fileMatch": ["/(^|/)ci-base\\.requirements\\.txt$/"]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Elixir version in ci-base image tag — resolved against real hexpm/elixir tags",
-      "managerFilePatterns": ["/(^|/)ci-base\\.Dockerfile$/"],
+      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/"],
       "matchStrings": ["ARG ELIXIR_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "elixir",
       "packageNameTemplate": "hexpm/elixir",
@@ -30,7 +30,7 @@
     {
       "customType": "regex",
       "description": "Erlang/OTP version in ci-base image tag — resolved against real hexpm/elixir tags",
-      "managerFilePatterns": ["/(^|/)ci-base\\.Dockerfile$/"],
+      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/"],
       "matchStrings": ["ARG OTP_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "erlang-otp",
       "packageNameTemplate": "hexpm/elixir",
@@ -41,13 +41,22 @@
     {
       "customType": "regex",
       "description": "Debian snapshot in ci-base image tag — resolved against real hexpm/elixir tags, stays on trixie-slim",
-      "managerFilePatterns": ["/(^|/)ci-base\\.Dockerfile$/", "/(^|/)selfhosted\\.Dockerfile$/"],
+      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/", "/(^|/)selfhosted\\.Dockerfile$/"],
       "matchStrings": ["ARG DEBIAN_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "debian",
       "packageNameTemplate": "hexpm/elixir",
       "datasourceTemplate": "docker",
       "versioningTemplate": "regex:^trixie-(?<major>\\d{4})(?<minor>\\d{2})(?<patch>\\d{2})-slim$",
       "extractVersionTemplate": "^\\d+\\.\\d+\\.\\d+-erlang-[\\d.]+-debian-(?<version>trixie-\\d+-slim)$"
+    },
+    {
+      "customType": "regex",
+      "description": "yt-dlp release in the shared CI base image",
+      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/"],
+      "matchStrings": ["ARG YT_DLP_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "yt-dlp/yt-dlp",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose"
     }
   ],
   "packageRules": [

@@ -9,14 +9,14 @@
 #   - deno:    pinned via install.sh version arg below. Renovate manages via the comment.
 #   - apprise: pinned in docker/ci-base.requirements.txt so Renovate's pip_requirements
 #              manager can bump it.
-#   - yt-dlp:  intentionally floats to latest at base build time. selfhosted's runner
-#              re-installs yt-dlp fresh on every release build, and runtime self-updates
-#              via PostBootStartupTasks, so the version here doesn't reach production.
+#   - yt-dlp:  pinned to the exact release below and managed by Renovate. selfhosted's
+#              runner copies this binary into production, so this is the single source
+#              of truth for the shipped version.
 #   - oh-my-zsh: floats to master. Affects dev shell ergonomics only; low stakes.
 #
-# Drift caveat: ci-base ships ffmpeg into selfhosted's runner, so bumping the ffmpeg
-# pin here changes the ffmpeg binary users get. Consumers should pin to :sha-<...>, not
-# :latest, so any base bump goes through a PR.
+# Drift caveat: ci-base ships ffmpeg and yt-dlp into selfhosted's runner, so bumping
+# either pin here changes the binaries users get. Consumers should pin to :sha-<...>,
+# not :latest, so any base bump goes through a PR.
 # These three combine into the hexpm/elixir tag (see DEV_IMAGE below). hexpm only
 # publishes specific combos, so Renovate tracks each against the real hexpm/elixir
 # tag list (customManagers in renovate.json) and groups the bumps into one PR — it
@@ -26,6 +26,8 @@ ARG OTP_VERSION=28.5.0.4
 ARG DEBIAN_VERSION=trixie-20260713-slim
 # renovate: datasource=github-releases depName=denoland/deno
 ARG DENO_VERSION=v2.9.0
+# renovate: datasource=github-releases depName=yt-dlp/yt-dlp
+ARG YT_DLP_VERSION=2026.08.19
 # renovate: datasource=node-version depName=node
 ARG NODE_MAJOR=24
 # NOT renovate-tracked: ffmpeg is pinned for issue #347 (illegal instruction on some CPUs).
@@ -42,6 +44,7 @@ FROM ${DEV_IMAGE}
 # are only in scope for the FROM line itself.
 ARG TARGETPLATFORM
 ARG DENO_VERSION
+ARG YT_DLP_VERSION
 ARG NODE_MAJOR
 ARG FFMPEG_RELEASE
 ARG FFMPEG_BUILD
@@ -75,12 +78,13 @@ RUN echo "Building for ${TARGETPLATFORM:?}" && \
   mix local.rebar --force && \
   # Install Deno - required for YouTube downloads (See yt-dlp#14404)
   curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- ${DENO_VERSION} -y --no-modify-path && \
-  # Download yt-dlp (pinned to latest at base image build time)
+  # Download the exact yt-dlp release managed above.
+  export YT_DLP_BASE_URL="https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}" && \
   export YT_DLP_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
-  "linux/amd64")   echo "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"   ;; \
-  "linux/arm64")   echo "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64" ;; \
-  *)               echo "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"        ;; esac) && \
-  curl -L ${YT_DLP_DOWNLOAD} -o /usr/local/bin/yt-dlp && \
+  "linux/amd64")   echo "${YT_DLP_BASE_URL}/yt-dlp_linux"          ;; \
+  "linux/arm64")   echo "${YT_DLP_BASE_URL}/yt-dlp_linux_aarch64" ;; \
+  *)               echo "${YT_DLP_BASE_URL}/yt-dlp_linux"          ;; esac) && \
+  curl -fsSL ${YT_DLP_DOWNLOAD} -o /usr/local/bin/yt-dlp && \
   chmod a+rx /usr/local/bin/yt-dlp && \
   # Install Apprise (version pinned in docker/ci-base.requirements.txt, managed by Renovate)
   export PIPX_HOME=/opt/pipx && \

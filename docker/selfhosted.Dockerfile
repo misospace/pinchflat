@@ -1,5 +1,5 @@
 # Builder stage runs on the shared ci-base image — it already provides Elixir, OTP,
-# build-essential, git, curl, node+yarn, hex, rebar, and the pinned ffmpeg binary.
+# build-essential, git, curl, node+yarn, hex, rebar, and the pinned ffmpeg/yt-dlp binaries.
 # Runner stage stays on debian:trixie-slim to keep the production image small.
 ARG DEBIAN_VERSION=trixie-20260713-slim
 ARG CI_BASE_IMAGE="ghcr.io/misospace/pinchflat-ci-base:latest"
@@ -56,10 +56,11 @@ ARG PORT=8945
 # renovate: datasource=github-releases depName=denoland/deno
 ARG DENO_VERSION=v2.9.0
 
-# ffmpeg comes from ci-base (pinned there, see issue #347). Bumping it requires
-# rebuilding ci-base and bumping the consumer pin — drift is intentional.
+# ffmpeg and yt-dlp come from ci-base (ffmpeg is pinned for issue #347). Bumping
+# either binary requires rebuilding ci-base and bumping the consumer pin.
 COPY --from=builder /usr/bin/ffmpeg /usr/bin/ffmpeg
 COPY --from=builder /usr/bin/ffprobe /usr/bin/ffprobe
+COPY --from=builder /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp
 
 # Apprise is pinned via the shared requirements file so dev/CI and production
 # install the same version (single source of truth with ci-base).
@@ -93,14 +94,6 @@ RUN apt-get update -y && \
     export PIPX_BIN_DIR=/usr/local/bin && \
     pipx install "$(cat /tmp/ci-base.requirements.txt)" && \
     rm /tmp/ci-base.requirements.txt && \
-    # yt-dlp
-    export YT_DLP_DOWNLOAD=$(case ${TARGETPLATFORM:-linux/amd64} in \
-    "linux/amd64")   echo "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"   ;; \
-    "linux/arm64")   echo "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64" ;; \
-    *)               echo "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"        ;; esac) && \
-    curl -L ${YT_DLP_DOWNLOAD} -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp && \
-    yt-dlp -U && \
     # Set the locale
     sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen && \
     # Clean up
