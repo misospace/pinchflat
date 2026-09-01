@@ -1,9 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "helpers:pinGitHubActionDigests"
-  ],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "schedule": ["* * 1,15 * *"],
   "prHourlyLimit": 0,
   "prConcurrentLimit": 0,
@@ -13,13 +10,13 @@
     "erlang": "28.5.0.4"
   },
   "pip_requirements": {
-    "fileMatch": ["/(^|/)ci-base\\.requirements\\.txt$/"]
+    "managerFilePatterns": ["//(^|/)ci-base\\.requirements\\.txt$//"]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Elixir version in ci-base image tag — resolved against real hexpm/elixir tags",
-      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/"],
+      "managerFilePatterns": ["//(^|/)ci-base\\.Dockerfile$//"],
       "matchStrings": ["ARG ELIXIR_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "elixir",
       "packageNameTemplate": "hexpm/elixir",
@@ -30,7 +27,7 @@
     {
       "customType": "regex",
       "description": "Erlang/OTP version in ci-base image tag — resolved against real hexpm/elixir tags",
-      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/"],
+      "managerFilePatterns": ["//(^|/)ci-base\\.Dockerfile$//"],
       "matchStrings": ["ARG OTP_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "erlang-otp",
       "packageNameTemplate": "hexpm/elixir",
@@ -41,7 +38,10 @@
     {
       "customType": "regex",
       "description": "Debian snapshot in ci-base image tag — resolved against real hexpm/elixir tags, stays on trixie-slim",
-      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/", "/(^|/)selfhosted\\.Dockerfile$/"],
+      "managerFilePatterns": [
+        "//(^|/)ci-base\\.Dockerfile$//",
+        "//(^|/)selfhosted\\.Dockerfile$//"
+      ],
       "matchStrings": ["ARG DEBIAN_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "debian",
       "packageNameTemplate": "hexpm/elixir",
@@ -52,7 +52,7 @@
     {
       "customType": "regex",
       "description": "yt-dlp release in the shared CI base image",
-      "fileMatch": ["/(^|/)ci-base\\.Dockerfile$/"],
+      "managerFilePatterns": ["//(^|/)ci-base\\.Dockerfile$//"],
       "matchStrings": ["ARG YT_DLP_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "yt-dlp/yt-dlp",
       "datasourceTemplate": "github-releases",
