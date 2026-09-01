@@ -74,7 +74,7 @@ defmodule Pinchflat.MixProject do
       {:telemetry_poller, "~> 1.1"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2"},
+      {:dns_cluster, "~> 0.3"},
       {:plug_cowboy, "~> 2.5"},
       {:oban, "~> 2.17"},
       {:nimble_parsec, "~> 1.4"},
