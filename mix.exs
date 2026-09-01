@@ -57,7 +57,7 @@ defmodule Pinchflat.MixProject do
     [
       {:phoenix, "~> 1.8.0"},
       {:phoenix_ecto, "~> 4.4"},
-      {:ecto, "~> 3.12.3"},
+      {:ecto, "~> 3.14.0"},
       {:ecto_sql, "~> 3.12"},
       {:ecto_sqlite3, "~> 0.19.0"},
       {:ecto_sqlite3_extras, "~> 1.2.0"},
@@ -65,7 +65,7 @@ defmodule Pinchflat.MixProject do
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.2.0"},
       {:lazy_html, "~> 0.1", only: :test},
-      {:phoenix_live_dashboard, "~> 0.8.2"},
+      {:phoenix_live_dashboard, "~> 0.9.0"},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.5.0", runtime: Mix.env() == :dev},
       {:swoosh, "~> 1.3"},
