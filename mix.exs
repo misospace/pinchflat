@@ -74,7 +74,7 @@ defmodule Pinchflat.MixProject do
       {:telemetry_poller, "~> 1.1"},
       {:gettext, "~> 0.20"},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2"},
+      {:dns_cluster, "~> 0.3"},
       {:plug_cowboy, "~> 2.5"},
       {:oban, "~> 2.17"},
       {:nimble_parsec, "~> 1.4"},
@@ -85,7 +85,7 @@ defmodule Pinchflat.MixProject do
       {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.16.0", only: [:dev, :test], runtime: false},
       {:faker, "~> 0.19", only: :test},
-      {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # Force decimal 3.x to pull in the fix for GHSA-rhv4-8758-jx7v
       # (unbounded exponent DoS in Decimal.new). 2.4.1 is the newest 2.x and is
