@@ -72,7 +72,7 @@ defmodule Pinchflat.MixProject do
       {:finch, "~> 0.18"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.1"},
-      {:gettext, "~> 0.20"},
+      {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3"},
       {:plug_cowboy, "~> 2.5"},
