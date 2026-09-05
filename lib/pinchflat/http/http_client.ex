@@ -25,7 +25,7 @@ defmodule Pinchflat.HTTP.HTTPClient do
   @default_connect_timeout 5_000
 
   # `:httpc` does not expose a response-size option on the OTP version we use,
-  # so responses are streamed and cancelled once this cap is reached. Our
+  # so responses are buffered and rejected once this cap is reached. Our
   # consumers only fetch small payloads (RSS feeds, a single API page, one
   # release JSON), so a few MB is ample.
   @default_max_body_length 5_000_000
@@ -48,7 +48,6 @@ defmodule Pinchflat.HTTP.HTTPClient do
     request_opts =
       Keyword.merge(opts,
         sync: false,
-        stream: {:self, :once},
         body_format: :binary,
         full_result: true,
         receiver: self()
@@ -58,7 +57,7 @@ defmodule Pinchflat.HTTP.HTTPClient do
 
     case :httpc.request(:get, {url, headers}, http_opts, request_opts) do
       {:ok, request_id} ->
-        receive_response(request_id, max_body_length(), [], 0, nil, request_timeout())
+        receive_response(request_id, max_body_length(), request_timeout())
 
       {:error, reason} ->
         request_error(reason)
@@ -90,41 +89,8 @@ defmodule Pinchflat.HTTP.HTTPClient do
     |> Keyword.get(:max_body_length, @default_max_body_length)
   end
 
-  defp receive_response(request_id, max_body_length, body_parts, body_length, handler_pid, timeout) do
+  defp receive_response(request_id, max_body_length, timeout) do
     receive do
-      {:http, {^request_id, :stream_start, headers, new_handler_pid}} ->
-        if response_body_too_large?(content_length(headers), max_body_length) do
-          response_too_large(request_id, max_body_length)
-        else
-          :httpc.stream_next(new_handler_pid)
-          receive_response(request_id, max_body_length, body_parts, body_length, new_handler_pid, timeout)
-        end
-
-      {:http, {^request_id, :stream_start, headers}} ->
-        if response_body_too_large?(content_length(headers), max_body_length) do
-          response_too_large(request_id, max_body_length)
-        else
-          receive_response(request_id, max_body_length, body_parts, body_length, nil, timeout)
-        end
-
-      {:http, {^request_id, :stream, body_part}} ->
-        body_part = IO.iodata_to_binary(body_part)
-        new_body_length = body_length + byte_size(body_part)
-
-        if response_body_too_large?(new_body_length, max_body_length) do
-          response_too_large(request_id, max_body_length)
-        else
-          maybe_stream_next(handler_pid)
-          receive_response(request_id, max_body_length, [body_part | body_parts], new_body_length, handler_pid, timeout)
-        end
-
-      {:http, {^request_id, :stream_end, _headers}} ->
-        if response_body_too_large?(body_length, max_body_length) do
-          response_too_large(request_id, max_body_length)
-        else
-          {:ok, body_parts |> Enum.reverse() |> IO.iodata_to_binary()}
-        end
-
       {:http, {^request_id, {:error, reason}}} ->
         request_error(reason)
 
@@ -133,7 +99,7 @@ defmodule Pinchflat.HTTP.HTTPClient do
 
         cond do
           status_code in 200..299 and response_body_too_large?(byte_size(body), max_body_length) ->
-            response_too_large(request_id, max_body_length)
+            response_too_large(max_body_length)
 
           status_code in 200..299 ->
             {:ok, to_string(body)}
@@ -148,30 +114,13 @@ defmodule Pinchflat.HTTP.HTTPClient do
     end
   end
 
-  defp maybe_stream_next(nil), do: :ok
-  defp maybe_stream_next(handler_pid), do: :httpc.stream_next(handler_pid)
-
-  defp content_length(headers) do
-    case Enum.find(headers, fn {name, _value} -> String.downcase(to_string(name)) == "content-length" end) do
-      {_name, value} ->
-        case Integer.parse(String.trim(to_string(value))) do
-          {length, ""} -> length
-          _ -> nil
-        end
-
-      nil ->
-        nil
-    end
-  end
-
   defp response_body_too_large?(body_length, max_body_length)
        when is_integer(body_length) and is_integer(max_body_length),
        do: body_length > max_body_length
 
   defp response_body_too_large?(_body_length, _max_body_length), do: false
 
-  defp response_too_large(request_id, max_body_length) do
-    :httpc.cancel_request(request_id)
+  defp response_too_large(max_body_length) do
     {:error, "HTTP response body exceeded max_body_length of #{max_body_length} bytes"}
   end
 
