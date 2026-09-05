@@ -177,6 +177,35 @@ defmodule Pinchflat.Podcasts.RssFeedBuilderTest do
       # cannot terminate the CDATA and expose the trailing content as XML.
       assert String.contains?(item_xml, "<![CDATA[innocent]]]]><![CDATA[><malicious>injected</malicious>]]>")
     end
+
+    test "strips XML 1.0 forbidden control characters from source and media fields" do
+      # One forbidden char from each affected range: 0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F.
+      forbidden = <<0x01, 0x0B, 0x0C, 0x1F>>
+
+      source =
+        source_fixture(%{
+          custom_name: "Name #{forbidden} end",
+          description: "Desc #{forbidden} end"
+        })
+
+      _media_item =
+        media_item_with_attachments(%{
+          source_id: source.id,
+          title: "Title #{forbidden} end",
+          description: "Media desc #{forbidden} end"
+        })
+
+      res = RssFeedBuilder.build(source)
+
+      # (a) the document is well-formed XML.
+      assert {{:xmlElement, _, _, _, _, _, _, _, _, _, _, _}, _} =
+               :xmerl_scan.string(String.to_charlist(res))
+
+      # (b) no codepoint in the forbidden ranges survives anywhere in the feed.
+      assert Enum.all?(String.codepoints(res), fn cp ->
+               not (cp in 0x00..0x08 or cp in [0x0B, 0x0C] or cp in 0x0E..0x1F)
+             end)
+    end
   end
 
   defp format_date(date) do
