@@ -50,18 +50,24 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServer do
   end
 
   @impl true
-  def handle_cast({:watch_file, filepath, handler}, _old_state) do
-    {:ok, io_device} = :file.open(filepath, [:raw, :read_ahead, :binary])
+  def handle_cast({:watch_file, filepath, handler}, old_state) do
+    case :file.open(filepath, [:raw, :read_ahead, :binary]) do
+      {:ok, io_device} ->
+        state = %{
+          io_device: io_device,
+          last_activity: DateTime.utc_now(),
+          handler: handler
+        }
 
-    state = %{
-      io_device: io_device,
-      last_activity: DateTime.utc_now(),
-      handler: handler
-    }
+        Process.send(self(), :read_new_lines, [])
 
-    Process.send(self(), :read_new_lines, [])
+        {:noreply, state}
 
-    {:noreply, state}
+      {:error, reason} ->
+        Logger.error("Failed to open file for watching: #{filepath} (#{reason})")
+
+        {:stop, :normal, old_state}
+    end
   end
 
   @impl true
