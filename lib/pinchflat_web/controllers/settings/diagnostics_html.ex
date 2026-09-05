@@ -109,7 +109,6 @@ defmodule PinchflatWeb.Settings.DiagnosticsHTML do
     errors
     |> List.last()
     |> Map.get("error", "Unknown error")
-    |> String.slice(0, 200)
   end
 
   def extract_last_error(_), do: "No error details"
