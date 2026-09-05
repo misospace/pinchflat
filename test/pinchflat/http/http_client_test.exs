@@ -120,6 +120,59 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
     end
   end
 
+  describe "get/3 status codes" do
+    test "returns {:ok, body} for a 200 OK response" do
+      {port, cleanup} = start_status_listener!(200, "OK", "hello")
+
+      try do
+        assert {:ok, "hello"} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:ok, body} for a 201 Created response" do
+      {port, cleanup} = start_status_listener!(201, "Created", "created")
+
+      try do
+        assert {:ok, "created"} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:ok, \"\"} for a 204 No Content response" do
+      {port, cleanup} = start_status_listener!(204, "No Content", "")
+
+      try do
+        assert {:ok, ""} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:ok, body} for a 206 Partial Content response" do
+      {port, cleanup} = start_status_listener!(206, "Partial Content", "partial")
+
+      try do
+        assert {:ok, "partial"} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:error, _} for a non-2xx response" do
+      {port, cleanup} = start_status_listener!(404, "Not Found", "nope")
+
+      try do
+        assert {:error, "HTTP request failed with status code 404: Not Found"} =
+                 HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+  end
+
   # --- helpers ---------------------------------------------------------------
 
   # Starts a TCP listener on a free port and returns `{port, cleanup}` where
@@ -190,6 +243,39 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
             Enum.join(chunks) <> trailer
         )
 
+        :gen_tcp.close(socket)
+      end)
+
+    cleanup = fn ->
+      :gen_tcp.close(listen_socket)
+
+      if Process.alive?(pid) do
+        Process.exit(pid, :kill)
+      end
+    end
+
+    {port, cleanup}
+  end
+
+  # Starts a TCP listener on a free port that replies to the first request
+  # with the given status line and body. Returns `{port, cleanup}`.
+  defp start_status_listener!(status, reason_phrase, body) do
+    {:ok, listen_socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(listen_socket)
+
+    pid =
+      spawn(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        :gen_tcp.recv(socket, 0, 5_000)
+
+        response =
+          "HTTP/1.1 #{status} #{reason_phrase}\r\n" <>
+            "Content-Length: #{byte_size(body)}\r\n" <>
+            "Connection: close\r\n\r\n" <> body
+
+        :gen_tcp.send(socket, response)
         :gen_tcp.close(socket)
       end)
 
