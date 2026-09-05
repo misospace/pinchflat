@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.6](https://github.com/misospace/pinchflat/compare/v1.4.5...v1.4.6) (2026-09-05)
+
+
+### Bug Fixes
+
+* **ci:** pin yt-dlp builds ([#58](https://github.com/misospace/pinchflat/issues/58)) ([ffcbf0a](https://github.com/misospace/pinchflat/commit/ffcbf0aa7c975420d285c93b57176093d5fc5fe8))
+* **http:** cap the size of responses the shared HTTP client buffers ([#56](https://github.com/misospace/pinchflat/issues/56)) ([9495ce3](https://github.com/misospace/pinchflat/commit/9495ce33c3384b47c6305c6da0153bfd5c9dc7e2))
+* **http:** match any 2xx status in HTTPClient.get/3 ([#87](https://github.com/misospace/pinchflat/issues/87)) ([cda0106](https://github.com/misospace/pinchflat/commit/cda010610eebbf481fc96bf8c6c204069d9d6115)), closes [#83](https://github.com/misospace/pinchflat/issues/83)
+* **podcasts:** strip XML 1.0 forbidden control characters from RSS feed fields ([#88](https://github.com/misospace/pinchflat/issues/88)) ([d0a78f3](https://github.com/misospace/pinchflat/commit/d0a78f3f2df00fb50d89c518920185eb78f259c8))
+* **slow_indexing:** stop FileFollowerServer gracefully when watched file is missing or unreadable ([#90](https://github.com/misospace/pinchflat/issues/90)) ([ceaa9c0](https://github.com/misospace/pinchflat/commit/ceaa9c0577c4f088a8d7c6993619de3bfa6a7180)), closes [#85](https://github.com/misospace/pinchflat/issues/85)
+
+
+### Chores
+
+* **diagnostics:** show full last-attempt error instead of truncating to 200 chars ([#89](https://github.com/misospace/pinchflat/issues/89)) ([978dd42](https://github.com/misospace/pinchflat/commit/978dd423e8e47f2c685031cac76287e6bd57994b)), closes [#86](https://github.com/misospace/pinchflat/issues/86)
+
 ## [1.4.5](https://github.com/misospace/pinchflat/compare/v1.4.4...v1.4.5) (2026-08-25)
 
 
