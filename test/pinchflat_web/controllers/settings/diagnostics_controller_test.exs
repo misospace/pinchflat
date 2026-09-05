@@ -110,6 +110,26 @@ defmodule PinchflatWeb.Settings.DiagnosticsControllerTest do
     end
   end
 
+  describe "extract_last_error/1" do
+    test "returns the full error string without truncation" do
+      long_error = String.duplicate("x", 500) <> " tail"
+      errors = [%{"error" => "earlier failure"}, %{"error" => long_error}]
+
+      assert PinchflatWeb.Settings.DiagnosticsHTML.extract_last_error(errors) == long_error
+    end
+
+    test "returns the last error from the attempt history" do
+      errors = [%{"error" => "first"}, %{"error" => "second"}]
+
+      assert PinchflatWeb.Settings.DiagnosticsHTML.extract_last_error(errors) == "second"
+    end
+
+    test "returns a placeholder when there are no errors" do
+      assert PinchflatWeb.Settings.DiagnosticsHTML.extract_last_error([]) == "No error details"
+      assert PinchflatWeb.Settings.DiagnosticsHTML.extract_last_error(nil) == "No error details"
+    end
+  end
+
   defp job_in_state(state) do
     {:ok, job} = Oban.insert(TestJobWorker.new(%{}))
     Repo.update_all(from(j in Oban.Job, where: j.id == ^job.id), set: [state: state])
