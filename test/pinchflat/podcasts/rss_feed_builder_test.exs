@@ -178,7 +178,7 @@ defmodule Pinchflat.Podcasts.RssFeedBuilderTest do
       assert String.contains?(item_xml, "<![CDATA[innocent]]]]><![CDATA[><malicious>injected</malicious>]]>")
     end
 
-    test "strips XML 1.0 forbidden control characters from source and media fields", %{source: source} do
+    test "strips XML 1.0 forbidden control characters from source and media fields" do
       # One forbidden char from each affected range: 0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F.
       forbidden = <<0x01, 0x0B, 0x0C, 0x1F>>
 
@@ -201,10 +201,9 @@ defmodule Pinchflat.Podcasts.RssFeedBuilderTest do
       assert {{:xmlElement, _, _, _, _, _, _, _, _, _, _, _}, _} =
                :xmerl_scan.string(String.to_charlist(res))
 
-      # (b) no byte in the forbidden ranges survives anywhere in the feed.
+      # (b) no codepoint in the forbidden ranges survives anywhere in the feed.
       assert Enum.all?(String.codepoints(res), fn cp ->
-               codepoint = :unicode.characters_to_list(cp, :utf8) |> hd()
-               not (codepoint in 0x00..0x08 or codepoint in [0x0B, 0x0C] or codepoint in 0x0E..0x1F)
+               not (cp in 0x00..0x08 or cp in [0x0B, 0x0C] or cp in 0x0E..0x1F)
              end)
     end
   end
