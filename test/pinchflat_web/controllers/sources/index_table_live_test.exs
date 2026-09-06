@@ -108,6 +108,19 @@ defmodule PinchflatWeb.Sources.SourceLive.IndexTableLiveTest do
       assert render_element(view, "tbody tr:first-child") =~ source2.custom_name
       assert render_element(view, "tbody tr:last-child") =~ source1.custom_name
     end
+
+    test "an unknown sort key does not raise and keeps the previous sort", %{conn: conn} do
+      source1 = source_fixture(custom_name: "Source_B")
+      source2 = source_fixture(custom_name: "Source_A")
+
+      {:ok, view, _html} = live_isolated(conn, IndexTableLive, session: create_session())
+
+      render_click(view, "sort_update", %{"sort_key" => "not_a_real_sort_key"})
+
+      # the page re-renders without raising and the sort is unchanged
+      assert render_element(view, "tbody tr:first-child") =~ source2.custom_name
+      assert render_element(view, "tbody tr:last-child") =~ source1.custom_name
+    end
   end
 
   describe "when sorting by the other columns" do
