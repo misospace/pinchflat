@@ -343,7 +343,7 @@ defmodule Pinchflat.Diagnostics.QueueDiagnostics do
       select: {j.state, count(j.id)}
     )
     |> Repo.all()
-    |> Enum.into(%{}, fn {state, count} -> {String.to_atom(state), count} end)
+    |> Enum.into(%{}, fn {state, count} -> {String.to_existing_atom(state), count} end)
   end
 
   defp count_pending_downloads do
