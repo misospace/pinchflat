@@ -43,6 +43,22 @@ defmodule Pinchflat.Diagnostics.QueueDiagnosticsTest do
 
       assert %{available: 2, retryable: 1, scheduled: 0, executing: 0} = default_stats
     end
+
+    test "counts jobs in every known state as existing atoms" do
+      {:ok, available} = Oban.insert(TestJobWorker.new(%{"id" => 1}))
+      {:ok, scheduled} = Oban.insert(TestJobWorker.new(%{"id" => 2}))
+      {:ok, retryable} = Oban.insert(TestJobWorker.new(%{"id" => 3}))
+      {:ok, executing} = Oban.insert(TestJobWorker.new(%{"id" => 4}))
+
+      set_job_state(scheduled, "scheduled")
+      set_job_state(retryable, "retryable")
+      set_job_state(executing, "executing")
+
+      default_stats = Enum.find(QueueDiagnostics.get_all_queue_stats(), &(&1.name == :default))
+
+      assert %{available: 1, scheduled: 1, retryable: 1, executing: 1} = default_stats
+      assert available.state == "available"
+    end
   end
 
   describe "get_retryable_jobs/1" do
