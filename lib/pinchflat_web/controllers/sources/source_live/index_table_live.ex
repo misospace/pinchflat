@@ -37,18 +37,28 @@ defmodule PinchflatWeb.Sources.SourceLive.IndexTableLive do
     |> then(&{:noreply, &1})
   end
 
+  @valid_sort_keys ~w(custom_name pending_count downloaded_count media_size_bytes media_profile_name enabled)
+
   def handle_event("sort_update", %{"sort_key" => sort_key}, %{assigns: assigns} = socket) do
-    new_sort_key = String.to_existing_atom(sort_key)
+    case sort_key do
+      key when key in @valid_sort_keys ->
+        new_sort_key = String.to_atom(key)
 
-    new_params = %{
-      sort_key: new_sort_key,
-      sort_direction: get_sort_direction(assigns.sort_key, new_sort_key, assigns.sort_direction)
-    }
+        new_params = %{
+          sort_key: new_sort_key,
+          sort_direction: get_sort_direction(assigns.sort_key, new_sort_key, assigns.sort_direction)
+        }
 
-    socket
-    |> assign(new_params)
-    |> set_sources()
-    |> then(&{:noreply, &1})
+        socket
+        |> assign(new_params)
+        |> set_sources()
+        |> then(&{:noreply, &1})
+
+      _ ->
+        # unknown sort keys (stale bookmarks, mistyped URLs) are ignored so the
+        # page keeps its current sort instead of crashing
+        {:noreply, socket}
+    end
   end
 
   defp sort_attr(:pending_count), do: dynamic([s, mp, dl, pe], pe.pending_count)
