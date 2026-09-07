@@ -201,6 +201,37 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
 
       assert {:error, _} = FilesystemUtils.delete_file_and_remove_empty_directories(filepath)
     end
+
+    test "logs an error if an empty directory could not be removed" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      parent = Path.join([tmpfile_directory, "ro_parent"])
+      empty_dir = Path.join([parent, "empty"])
+      filepath = Path.join([empty_dir, "qux.json"])
+      FilesystemUtils.write_p!(filepath, "")
+
+      # Make the parent read-only so File.rmdir/1 on the empty directory
+      # fails with a permission error instead of succeeding.
+      :ok = File.chmod(parent, 0o555)
+
+      on_exit(fn ->
+        File.chmod(parent, 0o755)
+        File.rm_rf!(parent)
+      end)
+
+      Logger.configure(level: :warning)
+
+      on_exit(fn -> Logger.configure(level: :critical) end)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert :ok = FilesystemUtils.delete_file_and_remove_empty_directories(filepath)
+        end)
+
+      # The file is deleted, but the empty directory could not be removed, so
+      # the failure must surface in the log rather than being silently dropped.
+      assert log =~ "Failed to remove empty directories for #{filepath}"
+      assert log =~ ":eperm" or log =~ ":eacces"
+    end
   end
 
   describe "cp_p!/2" do

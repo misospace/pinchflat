@@ -2,6 +2,8 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   @moduledoc """
   Utility methods for working with the filesystem
   """
+  require Logger
+
   alias Pinchflat.Media
   alias Pinchflat.Utils.StringUtils
 
@@ -127,9 +129,15 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   def delete_file_and_remove_empty_directories(filepath) do
     case File.rm(filepath) do
       :ok ->
-        filepath
-        |> Path.dirname()
-        |> recursively_delete_empty_directories()
+        case filepath |> Path.dirname() |> recursively_delete_empty_directories() do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Failed to remove empty directories for #{filepath}: #{inspect(reason)}")
+
+            :ok
+        end
 
       err ->
         err
@@ -143,10 +151,16 @@ defmodule Pinchflat.Utils.FilesystemUtils do
         |> Path.dirname()
         |> recursively_delete_empty_directories()
 
-      err ->
-        err
-    end
+      # A non-empty directory (or one that no longer exists) is the expected
+      # stop condition for the walk, not an error worth surfacing.
+      {:error, :eexist} ->
+        :ok
 
-    :ok
+      {:error, :enoent} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 end

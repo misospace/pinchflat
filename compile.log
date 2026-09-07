@@ -1,0 +1,48 @@
+===> Analyzing applications...
+===> Compiling cowlib
+===> Analyzing applications...
+===> Compiling cowboy
+===> Analyzing applications...
+===> Compiling cowboy_telemetry
+==> plug_cowboy
+Compiling 5 files (.ex)
+Generated plug_cowboy app
+==> swoosh
+Compiling 62 files (.ex)
+Generated swoosh app
+==> websock_adapter
+Compiling 4 files (.ex)
+Generated websock_adapter app
+==> phoenix
+Compiling 74 files (.ex)
+Generated phoenix app
+==> phoenix_live_view
+Compiling 55 files (.ex)
+Generated phoenix_live_view app
+==> phoenix_live_dashboard
+Compiling 36 files (.ex)
+     warning: Postgrex.Interval.to_string/1 is undefined (module Postgrex.Interval is not available or is yet to be defined)
+     │
+ 326 │     do: struct.to_string(value)
+     │                ~
+     │
+     └─ lib/phoenix/live_dashboard/pages/ecto_stats_page.ex:326:16: Phoenix.LiveDashboard.EctoStatsPage.format/2
+
+Generated phoenix_live_dashboard app
+==> prom_ex
+Compiling 40 files (.ex)
+Generated prom_ex app
+warning: "xref: [exclude: ...]" in your mix.exs file is deprecated, instead use: "elixirc_options: [no_warn_undefined: ...]"
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:243: Mix.Tasks.Compile.Elixir.xref_exclude_opts/2
+  (mix 1.20.4) lib/mix/tasks/compile.elixir.ex:142: Mix.Tasks.Compile.Elixir.run/1
+  (mix 1.20.4) lib/mix/task.ex:502: anonymous fn/3 in Mix.Task.run_task/5
+  (mix 1.20.4) lib/mix/task.compiler.ex:299: Mix.Task.Compiler.run_compiler/2
+  (mix 1.20.4) lib/mix/task.compiler.ex:287: Mix.Task.Compiler.run/4
+  (mix 1.20.4) lib/mix/tasks/compile.all.ex:75: Mix.Tasks.Compile.All.do_run/2
+
+==> phoenix_ecto
+Compiling 7 files (.ex)
+Generated phoenix_ecto app
+==> pinchflat
+Compiling 137 files (.ex)
+Generated pinchflat app
