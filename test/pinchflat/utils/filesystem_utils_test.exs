@@ -239,6 +239,29 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
       assert :ok = FilesystemUtils.recursively_delete_empty_directories(Path.dirname(filepath))
     end
 
+    test "logs a debug message when the walk stops at a non-empty parent" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = Path.join([tmpfile_directory, "non_empty_walk_debug", "qux.json"])
+      FilesystemUtils.write_p!(filepath, "")
+      directory = Path.dirname(filepath)
+
+      # :eexist is what File.rmdir/1 returns when the directory still has
+      # children, which is the expected stop condition for the walk. Operators
+      # rely on the debug line to tell "walk hit a non-empty parent" apart
+      # from "nothing to do" — bump the logger below the :critical default so
+      # capture_log can see it.
+      original_level = Logger.level()
+      Logger.configure(level: :debug)
+      on_exit(fn -> Logger.configure(level: original_level) end)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert :ok = FilesystemUtils.recursively_delete_empty_directories(directory)
+        end)
+
+      assert log =~ "Empty-directory walk stopped at non-empty parent #{directory}"
+    end
+
     test "propagates {:error, :eperm} from File.rmdir/1" do
       directory = FilesystemUtils.generate_metadata_tmpfile(:json) |> Path.dirname()
 

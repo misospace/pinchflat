@@ -178,9 +178,13 @@ defmodule Pinchflat.Utils.FilesystemUtils do
         |> Path.dirname()
         |> recursively_delete_empty_directories()
 
-      # A non-empty directory (or one that no longer exists) is the expected
-      # stop condition for the walk, not an error worth surfacing.
+      # A non-empty directory is the expected stop condition for the walk —
+      # benign in its own right, but worth a debug line so operators can
+      # distinguish "walk hit a non-empty parent" from "nothing to do" (the
+      # :enoent case below) when triaging missing-directory reports.
       {:error, :eexist} ->
+        Logger.debug("Empty-directory walk stopped at non-empty parent #{directory}")
+
         :ok
 
       {:error, :enoent} ->
