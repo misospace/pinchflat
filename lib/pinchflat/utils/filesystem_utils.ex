@@ -124,6 +124,14 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   Deletes a file and removes any empty directories in the path.
   Does NOT remove any directories that are not empty.
 
+  If the file itself cannot be removed the underlying error tuple is returned.
+  If the file is removed but empty-directory cleanup fails part-way through
+  (e.g. permission, I-O, or readonly-fs errors from `File.rmdir/1`), the
+  error is logged via `Logger.warning/1` and `:ok` is still returned —
+  the callers of this function expect an `:ok` on a successful file delete,
+  and silent accumulation of empty parent directories is the failure mode
+  this function exists to prevent, not to surface to upstream callers.
+
   Returns :ok | {:error, any()}
   """
   def delete_file_and_remove_empty_directories(filepath) do

@@ -247,6 +247,39 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
       assert {:error, :eperm} = FilesystemUtils.recursively_delete_empty_directories(directory)
     end
 
+    test "propagates {:error, reason} from deeper in the recursive walk" do
+      # Build a real, nested empty directory tree so Path.dirname/1 actually
+      # walks up multiple levels. The leaf rmdir succeeds, then a parent
+      # rmdir fails — exercising the {:error, reason} -> {:error, reason}
+      # propagation through the recursive call, not just at the top frame.
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      walk_root = Path.join([tmpfile_directory, "deep_walk_propagate"])
+      leaf_dir = Path.join([walk_root, "a", "b"])
+      File.mkdir_p!(leaf_dir)
+      on_exit(fn -> File.rm_rf!(walk_root) end)
+
+      counter = :counters.new(1, [])
+
+      stub(FileBackendMock, :rmdir, fn _directory ->
+        # :counters.add/3 returns :ok — use get/2 to read the current value,
+        # then increment for the next call. First call clears the leaf;
+        # subsequent calls (walking up the parent chain) hit the error.
+        n = :counters.get(counter, 1) + 1
+        :counters.put(counter, 1, n)
+
+        if n == 1 do
+          :ok
+        else
+          {:error, :eperm}
+        end
+      end)
+
+      assert {:error, :eperm} = FilesystemUtils.recursively_delete_empty_directories(leaf_dir)
+      # Two or more rmdir calls were issued — the walk actually recursed past
+      # the first frame before hitting the error.
+      assert :counters.get(counter, 1) >= 2
+    end
+
     test "treats {:error, :enoent} from File.rmdir/1 as the walk stop" do
       directory = FilesystemUtils.generate_metadata_tmpfile(:json) |> Path.dirname()
 
