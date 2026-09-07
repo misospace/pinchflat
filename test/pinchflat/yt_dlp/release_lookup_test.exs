@@ -46,5 +46,16 @@ defmodule Pinchflat.YtDlp.ReleaseLookupTest do
       refute ReleaseLookup.version_available?("")
       refute ReleaseLookup.version_available?(nil)
     end
+
+    test "URL-encodes a version containing reserved characters" do
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "releases/tags/2025.07.01%2Fevil"
+        refute url =~ "releases/tags/2025.07.01/evil"
+
+        {:ok, "{}"}
+      end)
+
+      assert ReleaseLookup.version_available?("2025.07.01/evil")
+    end
   end
 end

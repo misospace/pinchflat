@@ -145,13 +145,13 @@ defmodule Pinchflat.FastIndexing.YoutubeApi do
     property_type = "contentDetails"
     max_results = 50
 
-    "#{api_base}?part=#{property_type}&maxResults=#{max_results}&playlistId=#{playlist_id}&key=#{next_api_key()}"
+    "#{api_base}?part=#{property_type}&maxResults=#{max_results}&playlistId=#{URI.encode_www_form(playlist_id)}&key=#{URI.encode_www_form(next_api_key())}"
   end
 
   defp construct_test_endpoint(api_key) do
     api_base = "https://youtube.googleapis.com/youtube/v3/playlistItems"
 
-    "#{api_base}?part=id&maxResults=1&playlistId=#{@test_playlist_id}&key=#{api_key}"
+    "#{api_base}?part=id&maxResults=1&playlistId=#{@test_playlist_id}&key=#{URI.encode_www_form(api_key)}"
   end
 
   defp http_client do
