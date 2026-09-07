@@ -144,8 +144,18 @@ defmodule Pinchflat.Utils.FilesystemUtils do
     end
   end
 
-  defp recursively_delete_empty_directories(directory) do
-    case File.rmdir(directory) do
+  @doc """
+  Recursively removes empty directories walking up from `directory` until it
+  hits a directory that is non-empty (or no longer exists).
+
+  Returns `:ok` if every directory along the walk was empty and could be
+  removed, or `{:error, reason}` if a permission / I-O / readonly-fs error
+  halted the walk before completion.
+  """
+  def recursively_delete_empty_directories(directory) do
+    backend = Application.get_env(:pinchflat, :file_backend, Pinchflat.Utils.RealFileBackend)
+
+    case backend.rmdir(directory) do
       :ok ->
         directory
         |> Path.dirname()

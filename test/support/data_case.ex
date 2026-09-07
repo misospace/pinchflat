@@ -31,6 +31,13 @@ defmodule Pinchflat.DataCase do
       import Pinchflat.TestingHelperMethods
 
       setup :verify_on_exit!
+
+      # Default: route filesystem rmdir through the real File.rmdir/1. Tests
+      # that need to exercise an error path override this stub.
+      setup do
+        stub(FileBackendMock, :rmdir, fn path -> File.rmdir(path) end)
+        :ok
+      end
     end
   end
 

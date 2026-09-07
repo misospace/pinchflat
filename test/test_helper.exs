@@ -13,6 +13,9 @@ Application.put_env(:pinchflat, :user_script_runner, UserScriptRunnerMock)
 Mox.defmock(YoutubeApiMock, for: Pinchflat.FastIndexing.YoutubeBehaviour)
 Application.put_env(:pinchflat, :youtube_api, YoutubeApiMock)
 
+Mox.defmock(FileBackendMock, for: Pinchflat.Utils.FileBackend)
+Application.put_env(:pinchflat, :file_backend, FileBackendMock)
+
 ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(Pinchflat.Repo, :manual)
 Faker.start()
