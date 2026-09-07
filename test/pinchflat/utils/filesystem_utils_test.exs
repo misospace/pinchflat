@@ -201,6 +201,92 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
 
       assert {:error, _} = FilesystemUtils.delete_file_and_remove_empty_directories(filepath)
     end
+
+    test "logs an error if an empty directory could not be removed" do
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+
+      # Stub File.rmdir/1 (via the FileBackend behaviour) to fail with
+      # :eperm so the empty-directory cleanup step fails deterministically,
+      # independent of POSIX permissions or the CI uid.
+      stub(FileBackendMock, :rmdir, fn _directory -> {:error, :eperm} end)
+
+      # Bump the logger above the :critical default so capture_log can see
+      # the warning emitted by the cleanup path.
+      original_level = Logger.level()
+      Logger.configure(level: :warning)
+      on_exit(fn -> Logger.configure(level: original_level) end)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert :ok = FilesystemUtils.delete_file_and_remove_empty_directories(filepath)
+        end)
+
+      # The file is deleted, but the empty directory could not be removed, so
+      # the failure must surface in the log rather than being silently dropped.
+      assert log =~ "Failed to remove empty directories for #{filepath}"
+      assert log =~ ":eperm"
+    end
+  end
+
+  describe "recursively_delete_empty_directories/1" do
+    test "returns :ok when the parent directory contains other files" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = Path.join([tmpfile_directory, "non_empty_walk", "qux.json"])
+      FilesystemUtils.write_p!(filepath, "")
+
+      # :eexist is what File.rmdir/1 returns when the directory still has
+      # children, which is the expected stop condition for the walk.
+      assert :ok = FilesystemUtils.recursively_delete_empty_directories(Path.dirname(filepath))
+    end
+
+    test "propagates {:error, :eperm} from File.rmdir/1" do
+      directory = FilesystemUtils.generate_metadata_tmpfile(:json) |> Path.dirname()
+
+      stub(FileBackendMock, :rmdir, fn _directory -> {:error, :eperm} end)
+
+      assert {:error, :eperm} = FilesystemUtils.recursively_delete_empty_directories(directory)
+    end
+
+    test "propagates {:error, reason} from deeper in the recursive walk" do
+      # Build a real, nested empty directory tree so Path.dirname/1 actually
+      # walks up multiple levels. The leaf rmdir succeeds, then a parent
+      # rmdir fails — exercising the {:error, reason} -> {:error, reason}
+      # propagation through the recursive call, not just at the top frame.
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      walk_root = Path.join([tmpfile_directory, "deep_walk_propagate"])
+      leaf_dir = Path.join([walk_root, "a", "b"])
+      File.mkdir_p!(leaf_dir)
+      on_exit(fn -> File.rm_rf!(walk_root) end)
+
+      counter = :counters.new(1, [])
+
+      stub(FileBackendMock, :rmdir, fn _directory ->
+        # :counters.add/3 returns :ok — use get/2 to read the current value,
+        # then increment for the next call. First call clears the leaf;
+        # subsequent calls (walking up the parent chain) hit the error.
+        n = :counters.get(counter, 1) + 1
+        :counters.put(counter, 1, n)
+
+        if n == 1 do
+          :ok
+        else
+          {:error, :eperm}
+        end
+      end)
+
+      assert {:error, :eperm} = FilesystemUtils.recursively_delete_empty_directories(leaf_dir)
+      # Two or more rmdir calls were issued — the walk actually recursed past
+      # the first frame before hitting the error.
+      assert :counters.get(counter, 1) >= 2
+    end
+
+    test "treats {:error, :enoent} from File.rmdir/1 as the walk stop" do
+      directory = FilesystemUtils.generate_metadata_tmpfile(:json) |> Path.dirname()
+
+      stub(FileBackendMock, :rmdir, fn _directory -> {:error, :enoent} end)
+
+      assert :ok = FilesystemUtils.recursively_delete_empty_directories(directory)
+    end
   end
 
   describe "cp_p!/2" do

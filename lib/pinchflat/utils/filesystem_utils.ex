@@ -2,6 +2,8 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   @moduledoc """
   Utility methods for working with the filesystem
   """
+  require Logger
+
   alias Pinchflat.Media
   alias Pinchflat.Utils.StringUtils
 
@@ -122,31 +124,70 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   Deletes a file and removes any empty directories in the path.
   Does NOT remove any directories that are not empty.
 
+  If the file itself cannot be removed the underlying error tuple is returned.
+  If the file is removed but empty-directory cleanup fails part-way through
+  (e.g. permission, I-O, or readonly-fs errors from `File.rmdir/1`), the
+  error is logged via `Logger.warning/1` and `:ok` is still returned —
+  the callers of this function expect an `:ok` on a successful file delete,
+  and silent accumulation of empty parent directories is the failure mode
+  this function exists to prevent, not to surface to upstream callers.
+
+  Callers: `Media.delete_media_item/2`, `Media.delete_media_files/2`,
+  `Media.delete_internal_metadata_files/1`, `Sources.delete_source/2`,
+  `Sources.delete_source_files/1`, `Sources.delete_internal_metadata_files/1`,
+  and `FileSyncing.handle_file_deletion/2`. None of these inspect the return
+  value — every call site is either a discarded `Enum.each/2` callback
+  or a discarded expression in an `if` block — so the
+  `:ok`-on-partial-cleanup-failure contract is preserved without any
+  observable contract change for upstream callers.
+
   Returns :ok | {:error, any()}
   """
   def delete_file_and_remove_empty_directories(filepath) do
     case File.rm(filepath) do
       :ok ->
-        filepath
-        |> Path.dirname()
-        |> recursively_delete_empty_directories()
+        case filepath |> Path.dirname() |> recursively_delete_empty_directories() do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Failed to remove empty directories for #{filepath}: #{inspect(reason)}")
+
+            :ok
+        end
 
       err ->
         err
     end
   end
 
-  defp recursively_delete_empty_directories(directory) do
-    case File.rmdir(directory) do
+  @doc """
+  Recursively removes empty directories walking up from `directory` until it
+  hits a directory that is non-empty (or no longer exists).
+
+  Returns `:ok` if every directory along the walk was empty and could be
+  removed, or `{:error, reason}` if a permission / I-O / readonly-fs error
+  halted the walk before completion.
+  """
+  def recursively_delete_empty_directories(directory) do
+    backend = Application.get_env(:pinchflat, :file_backend, Pinchflat.Utils.RealFileBackend)
+
+    case backend.rmdir(directory) do
       :ok ->
         directory
         |> Path.dirname()
         |> recursively_delete_empty_directories()
 
-      err ->
-        err
-    end
+      # A non-empty directory (or one that no longer exists) is the expected
+      # stop condition for the walk, not an error worth surfacing.
+      {:error, :eexist} ->
+        :ok
 
-    :ok
+      {:error, :enoent} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 end
