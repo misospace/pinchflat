@@ -163,5 +163,16 @@ defmodule Pinchflat.FastIndexing.YoutubeApiTest do
       assert {:error, "HTTP request failed with status code 400: Bad Request"} =
                YoutubeApi.test_api_key("bad_key")
     end
+
+    test "URL-encodes a key containing reserved characters" do
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=test_key%26injected%3Dparam"
+        refute url =~ "key=test_key&"
+
+        {:ok, "{}"}
+      end)
+
+      assert :ok = YoutubeApi.test_api_key("test_key&injected=param")
+    end
   end
 end

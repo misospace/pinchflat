@@ -14,6 +14,14 @@ defmodule Pinchflat.FastIndexing.FastIndexingHelpersTest do
   alias Pinchflat.FastIndexing.FastIndexingHelpers
 
   setup do
+    # The youtube_api round-robin counter lives in a globally-registered Agent.
+    # Without resetting it here, stale counter state from other test files can
+    # leave next_api_key/0 returning nil on the first call of this file's tests.
+    case :global.whereis_name(Pinchflat.FastIndexing.YoutubeApi.KeyIndex) do
+      :undefined -> :ok
+      pid -> Agent.stop(pid)
+    end
+
     stub(YtDlpRunnerMock, :run, fn _url, :get_media_attributes, _opts, _ot, _addl ->
       {:ok, media_attributes_return_fixture()}
     end)

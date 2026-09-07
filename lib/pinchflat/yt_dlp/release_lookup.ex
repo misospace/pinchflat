@@ -37,13 +37,20 @@ defmodule Pinchflat.YtDlp.ReleaseLookup do
   Returns boolean()
   """
   def version_available?(version) when is_binary(version) and version != "" do
-    case http_client().get("#{@repo_api}/releases/tags/#{version}", @headers) do
+    case http_client().get("#{@repo_api}/releases/tags/#{encode_path_segment(version)}", @headers) do
       {:ok, _body} -> true
       {:error, _reason} -> false
     end
   end
 
   def version_available?(_version), do: false
+
+  # Encodes a single path segment, leaving only the RFC 3986 unreserved
+  # characters (alphanumerics, `-`, `.`, `_`, `~`) unescaped. A version pasted
+  # with a stray `/`, `?`, `#`, or space must not be able to alter the path.
+  defp encode_path_segment(segment) do
+    URI.encode(segment, fn c -> c in ?a..?z or c in ?A..?Z or c in ?0..?9 or c in [?-, ?., ?_, ?~] end)
+  end
 
   defp http_client do
     Application.get_env(:pinchflat, :http_client, Pinchflat.HTTP.HTTPClient)
