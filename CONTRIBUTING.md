@@ -22,13 +22,13 @@ Open an issue. Check for duplicates first. For bugs, include your Docker version
 
 ### Submitting code
 
-1. Fork the repo and create a branch from `master`.
+1. Fork the repo and create a branch from `main`.
 2. Make your changes. If you're adding a feature, consider opening an issue first to discuss it.
 3. Commit using [Conventional Commits](https://www.conventionalcommits.org/) — this drives automatic versioning:
    - `fix: ...` → patch release
    - `feat: ...` → minor release
    - `chore: ...` / `docs: ...` → no release bump
-4. Open a PR against `master`. CI will run tests and build a Docker image tagged `pr-<number>-<sha>` for testing.
+4. Open a PR against `main`. CI will run tests and build a Docker image tagged `pr-<number>-<sha>` for testing.
 5. A maintainer will review and merge.
 
 ### Development setup
@@ -37,4 +37,4 @@ TBA
 
 ## Release process
 
-Releases are managed automatically by [release-please](https://github.com/googleapis/release-please). When PRs are merged to `master`, release-please maintains a running Release PR that tracks the next version. Merging that PR cuts a release, publishes a GitHub Release, and pushes versioned Docker images to GHCR and Docker Hub.
+Releases are managed automatically by [release-please](https://github.com/googleapis/release-please). When PRs are merged to `main`, release-please maintains a running Release PR that tracks the next version. Merging that PR cuts a release, publishes a GitHub Release, and pushes versioned Docker images to GHCR.

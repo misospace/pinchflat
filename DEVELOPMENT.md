@@ -26,7 +26,7 @@ mix test test/path/to/file_test.exs           # single file
 mix test test/path/to/file_test.exs:42        # single test by line
 ```
 
-Tests mock yt-dlp/apprise via `test/scripts/yt-dlp-mocks/` — no real network calls.
+Tests mock yt-dlp/apprise via `test/support/scripts/yt-dlp-mocks/` — no real network calls.
 
 **On macOS** the suite can't run natively (needs the Linux SQLean `.so` extensions
 and the yt-dlp/ffmpeg/Deno/Apprise toolchain). Run tests through Docker instead —
@@ -58,11 +58,7 @@ yarn run lint:fix      # Prettier auto-fix
 ## Production Docker Build
 
 ```bash
-# Standard (depends on CI base image)
 docker build -f docker/selfhosted.Dockerfile -t pinchflat:local .
-
-# Self-contained (no external base image dependency)
-docker build -f selfhosted.og.Dockerfile -t pinchflat:local .
 ```
 
 ## Utility: List Published GHCR Images

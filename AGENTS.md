@@ -335,12 +335,9 @@ Automated via release-please; the current version lives in `version.txt` (and, m
 
 Real inconsistencies in the tree. Flag them if a PR touches the area; don't file drive-by cleanups.
 
-| Artifact                                                                                    | Reality                                                                                                               |
-| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `CONTRIBUTING.md` says branch from and PR against `master`                                  | The default and protected branch is **`main`**; `ci.yml` and `ai-pr-review.yaml` both trigger on `branches: ['main']` |
-| `CODEBASE.md` and `DEVELOPMENT.md` reference `test/files/` and `test/scripts/yt-dlp-mocks/` | They live at `test/support/files/` and `test/support/scripts/yt-dlp-mocks/`                                           |
-| `DEVELOPMENT.md:65` builds `selfhosted.og.Dockerfile`                                       | No such file exists — the only Dockerfiles are under `docker/`                                                        |
-| `tooling/version_bump.sh` / `mix version.bump` emit a `YYYY.M.D` version                    | Legacy, predates release-please. Versioning is release-please + `version.txt`                                         |
+| Artifact                                                                 | Reality                                                                       |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `tooling/version_bump.sh` / `mix version.bump` emit a `YYYY.M.D` version | Legacy, predates release-please. Versioning is release-please + `version.txt` |
 
 ## Filing issues for the autonomous loop
 

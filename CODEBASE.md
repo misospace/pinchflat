@@ -7,9 +7,9 @@
 | `lib/pinchflat/`        | Core Elixir business logic — downloading, indexing, media, sources, yt-dlp integration, settings, etc. |
 | `lib/pinchflat_web/`    | Phoenix web layer — controllers, LiveView components, helpers                                          |
 | `test/`                 | Mirror of `lib/` with test files, plus fixtures, support helpers, and test scripts                     |
-| `priv/repo/migrations/` | 79 Ecto database migration files (2024-01 through 2026-06)                                             |
+| `priv/repo/migrations/` | 80 Ecto database migration files (2024-01 through 2026-06)                                             |
 | `priv/gettext/`         | i18n translation templates and English error strings                                                   |
-| `priv/static/`          | Static web assets: favicon, Satoshi fonts (40 files), images, robots.txt                               |
+| `priv/static/`          | Static web assets: favicon, Satoshi fonts (44 files), images, robots.txt                               |
 | `priv/grafana/`         | 6 Grafana dashboard JSON definitions (BEAM, Ecto, Oban, Phoenix, LiveView, Application)                |
 | `assets/js/`            | Frontend JS — Alpine.js app entry, helpers, tabs, topbar vendor lib                                    |
 | `assets/css/`           | App CSS + Satoshi font CSS                                                                             |
@@ -110,8 +110,7 @@
 | GitHub Actions          | CI/CD platform — PR checks, releases, Docker image builds                        |
 | Docker / Docker Compose | Containerization for both dev and production                                     |
 | Docker Buildx + QEMU    | Multi-architecture builds (`linux/amd64` + `linux/arm64`)                        |
-| GHCR                    | GitHub Container Registry — hosts PR, RC, and CI base images                     |
-| Docker Hub              | Public release image hosting (`misospace/pinchflat`)                             |
+| GHCR                    | GitHub Container Registry — hosts PR, RC, release, and CI base images            |
 | release-please          | Automated semantic versioning and changelog generation from Conventional Commits |
 | Renovate                | Automated dependency update PRs                                                  |
 
@@ -165,12 +164,17 @@ esbuild and Tailwind are driven through Mix aliases defined in `mix.exs`, not st
 
 ## CI/CD (`.github/workflows/`)
 
-Both files are CI/release only — they are never run locally.
+All workflows are CI/release only — they are never run locally.
 
-| File                 | Purpose                                                                                                                                |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `ci.yml`             | PR pipeline — linting, Docker build/cache, pushes PR/RC image to GHCR                                                                  |
-| `release-please.yml` | Release pipeline — runs tests, invokes Release-Please, bumps versions, builds and pushes multi-arch Docker images to Docker Hub + GHCR |
+| File                   | Purpose                                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `ci-base.yml`          | CI Base Image — builds and pushes the shared `pinchflat-ci-base` toolchain image (amd64 + arm64) to GHCR                         |
+| `ci.yml`               | PR pipeline — linting + tests, builds the PR image (saved as an artifact) and the RC image (pushed to GHCR)                      |
+| `pr-image-publish.yml` | Publish PR Image — pushes the PR image artifact built by `ci.yml` to GHCR from the trusted base-repo context                     |
+| `release-image.yml`    | Release Image — builds and pushes the selfhosted release image to GHCR (auto after the CI base, or manually for an explicit ref) |
+| `release-please.yml`   | Release Please — runs tests, invokes Release-Please, builds and pushes the multi-arch release image to GHCR                      |
+| `image-cleanup.yml`    | Dev Image Cleanup — deletes old dev images (dispatch-only in this snapshot repo)                                                 |
+| `ai-pr-review.yaml`    | AI PR Review — automated AI review of pull requests                                                                              |
 
 ---
 
@@ -209,12 +213,12 @@ Run everything with `mix check`. Individual tools: `mix credo`, `mix sobelow`, `
 
 All test infrastructure is used in both local dev and CI.
 
-| File/Dir                     | Purpose                                                                                                        |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `test/support/`              | `conn_case.ex`, `data_case.ex`, `testing_helper_methods.ex` — Phoenix + Ecto test helpers                      |
-| `test/support/fixtures/`     | Factory modules for jobs, media, profiles, sources, tasks                                                      |
-| `test/files/`                | Static test data — channel/media photos, metadata JSON, info.json, test video (media.mkv), subtitle, thumbnail |
-| `test/scripts/yt-dlp-mocks/` | Mock executables — `repeater.sh` (echo mock for yt-dlp/apprise), `101_exit_code.sh` (error code mock)          |
+| File/Dir                             | Purpose                                                                                                        |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `test/support/`                      | `conn_case.ex`, `data_case.ex`, `testing_helper_methods.ex` — Phoenix + Ecto test helpers                      |
+| `test/support/fixtures/`             | Factory modules for jobs, media, profiles, sources, tasks                                                      |
+| `test/support/files/`                | Static test data — channel/media photos, metadata JSON, info.json, test video (media.mkv), subtitle, thumbnail |
+| `test/support/scripts/yt-dlp-mocks/` | Mock executables — `repeater.sh` (echo mock for yt-dlp/apprise), `101_exit_code.sh` (error code mock)          |
 
 ---
 
