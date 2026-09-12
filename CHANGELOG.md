@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.4.6](https://github.com/misospace/pinchflat/compare/v1.4.5...v1.4.6) (2026-09-12)
+
+
+### Bug Fixes
+
+* **ci:** pin yt-dlp builds ([#58](https://github.com/misospace/pinchflat/issues/58)) ([ffcbf0a](https://github.com/misospace/pinchflat/commit/ffcbf0aa7c975420d285c93b57176093d5fc5fe8))
+* **filesystem:** propagate File.rmdir errors in empty-directory cleanup ([#93](https://github.com/misospace/pinchflat/issues/93)) ([23f3a17](https://github.com/misospace/pinchflat/commit/23f3a17da0304c60345696b2ea87df1649d3d290))
+* **http:** cap the size of responses the shared HTTP client buffers ([#56](https://github.com/misospace/pinchflat/issues/56)) ([9495ce3](https://github.com/misospace/pinchflat/commit/9495ce33c3384b47c6305c6da0153bfd5c9dc7e2))
+* **http:** match any 2xx status in HTTPClient.get/3 ([#87](https://github.com/misospace/pinchflat/issues/87)) ([cda0106](https://github.com/misospace/pinchflat/commit/cda010610eebbf481fc96bf8c6c204069d9d6115)), closes [#83](https://github.com/misospace/pinchflat/issues/83)
+* **podcasts:** strip XML 1.0 forbidden control characters from RSS feed fields ([#88](https://github.com/misospace/pinchflat/issues/88)) ([d0a78f3](https://github.com/misospace/pinchflat/commit/d0a78f3f2df00fb50d89c518920185eb78f259c8))
+* **rollback:** delete ROLLBACK.md and rollback.sh, which describe a different downstream ([#95](https://github.com/misospace/pinchflat/issues/95)) ([74e4820](https://github.com/misospace/pinchflat/commit/74e4820e7eed383dd54116ef1ef94e5c193fac23))
+* **slow_indexing:** stop FileFollowerServer gracefully when watched file is missing or unreadable ([#90](https://github.com/misospace/pinchflat/issues/90)) ([ceaa9c0](https://github.com/misospace/pinchflat/commit/ceaa9c0577c4f088a8d7c6993619de3bfa6a7180)), closes [#85](https://github.com/misospace/pinchflat/issues/85)
+* **sources:** ignore unknown sort keys on the sources index instead of crashing ([#91](https://github.com/misospace/pinchflat/issues/91)) ([f6a2e5b](https://github.com/misospace/pinchflat/commit/f6a2e5b59b9f3177fd0f8cdfad04c7c3206f6f9c)), closes [#80](https://github.com/misospace/pinchflat/issues/80)
+* URL-encode API keys and pinned versions in outbound request URLs ([#94](https://github.com/misospace/pinchflat/issues/94)) ([be6c6cb](https://github.com/misospace/pinchflat/commit/be6c6cba37743fbb1de8cc6814889db3593a4761)), closes [#81](https://github.com/misospace/pinchflat/issues/81)
+
+
+### Chores
+
+* **diagnostics:** show full last-attempt error instead of truncating to 200 chars ([#89](https://github.com/misospace/pinchflat/issues/89)) ([978dd42](https://github.com/misospace/pinchflat/commit/978dd423e8e47f2c685031cac76287e6bd57994b)), closes [#86](https://github.com/misospace/pinchflat/issues/86)
+* **diagnostics:** use String.to_existing_atom/1 in queue job counts ([#92](https://github.com/misospace/pinchflat/issues/92)) ([d81e4d9](https://github.com/misospace/pinchflat/commit/d81e4d970d27122c6e1555f1da6bb1308bf1846e)), closes [#79](https://github.com/misospace/pinchflat/issues/79)
+
+
+### Documentation
+
+* correct stale references in CONTRIBUTING, CODEBASE, and DEVELOPMENT ([#96](https://github.com/misospace/pinchflat/issues/96)) ([24b359f](https://github.com/misospace/pinchflat/commit/24b359f3a18a8f560a5a83579565c22371ac0bb4))
+
 ## [1.4.5](https://github.com/misospace/pinchflat/compare/v1.4.4...v1.4.5) (2026-08-25)
 
 
