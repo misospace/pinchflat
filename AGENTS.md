@@ -130,6 +130,7 @@ Standard Phoenix + LiveView. Routes in `lib/pinchflat_web/router.ex`; controller
 
 - Podcast RSS/OPML endpoints bypass basic auth intentionally (podcast apps can't authenticate)
 - `/healthcheck` bypasses auth and CSRF
+- `/dev/dashboard` is gated by a dedicated `:dev_dashboard` pipeline (`PinchflatWeb.Plugs.dev_dashboard_basic_auth/2`) that 401s when no basic auth credentials are configured — the default. With `BASIC_AUTH_USERNAME`/`BASIC_AUTH_PASSWORD` set, it delegates to `Plug.BasicAuth`, so configured installs still reach the LiveDashboard
 - The `strip_trailing_extension` plug in `endpoint.ex` allows media streaming URLs with extensions
 - 404/500 pages render through a dedicated standalone layout (`components/layouts/error.html.heex`, set as `render_errors` `root_layout`), deliberately free of flash, LiveView, and `Settings.get!` DB calls so error rendering can't crash mid-render
 - `Plug.Static` pairs `only:` with `only_matching: ~w(favicon apple-touch-icon)` because `~p` emits digested filenames in prod that a literal `only:` match would reject

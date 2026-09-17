@@ -86,8 +86,17 @@ defmodule PinchflatWeb.Router do
     get "/healthcheck", HealthController, :check, log: false
   end
 
+  # Enforces Basic auth on the dev LiveDashboard even when no credentials are
+  # configured: `basic_auth` (in `:browser`) is a no-op on a default install where
+  # no credentials are set, so without this the dashboard would be anonymously
+  # reachable. `dev_dashboard_basic_auth` denies the request when credentials are
+  # absent and enforces Basic auth when they are present.
+  pipeline :dev_dashboard do
+    plug :dev_dashboard_basic_auth
+  end
+
   scope "/dev" do
-    pipe_through :browser
+    pipe_through [:browser, :dev_dashboard]
 
     live_dashboard "/dashboard",
       metrics: PinchflatWeb.Telemetry,

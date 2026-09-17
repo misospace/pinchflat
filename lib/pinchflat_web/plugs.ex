@@ -32,6 +32,27 @@ defmodule PinchflatWeb.Plugs do
   end
 
   @doc """
+  Always enforces Basic auth on the dev LiveDashboard, and denies access entirely when
+  `basic_auth_username` and `basic_auth_password` are not both set.
+
+  Unlike `basic_auth/2` (which is a no-op when credentials are missing, leaving the
+  dashboard anonymously reachable on a default self-hosted install), this plug responds
+  401 when there are no credentials to validate against. When both credentials ARE set it
+  delegates to `Plug.BasicAuth.basic_auth/3`, so the dashboard stays reachable for
+  installations that configure `BASIC_AUTH_USERNAME`/`BASIC_AUTH_PASSWORD`.
+  """
+  def dev_dashboard_basic_auth(conn, _opts) do
+    username = Application.get_env(:pinchflat, :basic_auth_username)
+    password = Application.get_env(:pinchflat, :basic_auth_password)
+
+    if credential_set?(username) && credential_set?(password) do
+      Plug.BasicAuth.basic_auth(conn, username: username, password: password, realm: "Pinchflat")
+    else
+      send_unauthorized(conn)
+    end
+  end
+
+  @doc """
   Removes the `x-frame-options` header so the response can be embedded in an iframe, and adds
   the baseline security headers (plus CORS) that the `:browser` pipeline's
   `put_secure_browser_headers` would normally provide.

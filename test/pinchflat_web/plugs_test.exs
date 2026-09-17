@@ -124,6 +124,122 @@ defmodule PinchflatWeb.PlugsTest do
     end
   end
 
+  describe "dev_dashboard_basic_auth/2" do
+    setup do
+      old_username = Application.get_env(:pinchflat, :basic_auth_username)
+      old_password = Application.get_env(:pinchflat, :basic_auth_password)
+
+      on_exit(fn ->
+        Application.put_env(:pinchflat, :basic_auth_username, old_username)
+        Application.put_env(:pinchflat, :basic_auth_password, old_password)
+      end)
+
+      :ok
+    end
+
+    test "denies access with 401 when the credentials are not set", %{conn: conn} do
+      Application.put_env(:pinchflat, :basic_auth_username, nil)
+      Application.put_env(:pinchflat, :basic_auth_password, nil)
+
+      conn = Plugs.dev_dashboard_basic_auth(conn, [])
+
+      assert conn.status == 401
+      assert conn.halted
+    end
+
+    test "denies access with 401 when the credentials are empty strings", %{conn: conn} do
+      Application.put_env(:pinchflat, :basic_auth_username, "")
+      Application.put_env(:pinchflat, :basic_auth_password, "")
+
+      conn = Plugs.dev_dashboard_basic_auth(conn, [])
+
+      assert conn.status == 401
+      assert conn.halted
+    end
+
+    test "denies access with 401 when the supplied credentials are wrong", %{conn: conn} do
+      Application.put_env(:pinchflat, :basic_auth_username, "user")
+      Application.put_env(:pinchflat, :basic_auth_password, "pass")
+
+      conn =
+        conn
+        |> put_req_header("authorization", Plug.BasicAuth.encode_basic_auth("user", "wrong"))
+        |> Plugs.dev_dashboard_basic_auth([])
+
+      assert conn.status == 401
+    end
+
+    test "allows access when the supplied credentials are correct", %{conn: conn} do
+      Application.put_env(:pinchflat, :basic_auth_username, "user")
+      Application.put_env(:pinchflat, :basic_auth_password, "pass")
+
+      conn =
+        conn
+        |> put_req_header("authorization", Plug.BasicAuth.encode_basic_auth("user", "pass"))
+        |> Plugs.dev_dashboard_basic_auth([])
+
+      # nil here means the response is unset, but that's good. It just means we're moving to the next stage
+      assert conn.status == nil
+    end
+  end
+
+  describe "GET /dev/dashboard (issue #103)" do
+    setup do
+      old_username = Application.get_env(:pinchflat, :basic_auth_username)
+      old_password = Application.get_env(:pinchflat, :basic_auth_password)
+
+      on_exit(fn ->
+        Application.put_env(:pinchflat, :basic_auth_username, old_username)
+        Application.put_env(:pinchflat, :basic_auth_password, old_password)
+      end)
+
+      :ok
+    end
+
+    test "is unreachable without credentials (default install)", %{conn: conn} do
+      # A default install leaves the credentials unset, so the dashboard must be
+      # denied — not silently let through the no-op `basic_auth` in the :browser pipeline.
+      Application.put_env(:pinchflat, :basic_auth_username, nil)
+      Application.put_env(:pinchflat, :basic_auth_password, nil)
+
+      conn = get(conn, "/dev/dashboard")
+
+      assert conn.status == 401
+      assert conn.halted
+    end
+
+    test "is denied with 401 when the supplied credentials are wrong", %{conn: conn} do
+      Application.put_env(:pinchflat, :basic_auth_username, "user")
+      Application.put_env(:pinchflat, :basic_auth_password, "pass")
+
+      encoded_auth = Plug.BasicAuth.encode_basic_auth("user", "wrong")
+
+      conn =
+        conn
+        |> put_req_header("authorization", encoded_auth)
+        |> get("/dev/dashboard")
+
+      assert conn.status == 401
+    end
+
+    test "lets the request past the auth plug when the supplied credentials are correct", %{conn: conn} do
+      Application.put_env(:pinchflat, :basic_auth_username, "user")
+      Application.put_env(:pinchflat, :basic_auth_password, "pass")
+
+      encoded_auth = Plug.BasicAuth.encode_basic_auth("user", "pass")
+
+      conn =
+        conn
+        |> put_req_header("authorization", encoded_auth)
+        |> get("/dev/dashboard")
+
+      # We expect to make it past the auth plug. The dashboard itself may not
+      # fully render in the test environment (the request still hits the
+      # LiveDashboard controller), but it must NOT be a 401 from the auth plug.
+      refute conn.status == 401
+    end
+  end
+
   describe "allow_iframe_embed/2" do
     test "deletes the x-frame-options header", %{conn: conn} do
       conn = put_resp_header(conn, "x-frame-options", "DENY")
