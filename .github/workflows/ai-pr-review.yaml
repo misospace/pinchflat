@@ -20,7 +20,12 @@ permissions:
 
 jobs:
   review:
-    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    # Skip release-please PRs (head branch release-please--branches--main):
+    # their review runs report `action_required` with no jobs (no logs), which
+    # never turns green and would permanently block the autorelease bot (#106).
+    if: >-
+      (github.event_name != 'pull_request' || !github.event.pull_request.draft) &&
+      !startsWith(github.head_ref, 'release-please')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

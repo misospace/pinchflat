@@ -297,6 +297,8 @@ For `chore` / `refactor` / `test` / `ci` / internal `perf`, keep writing normal 
 
 Automated via release-please; the current version lives in `version.txt` (and, mirrored, in `mix.exs` between the `x-release-please-*` markers). Merging the release PR cuts a release and publishes Docker images. `mix version.bump` / `tooling/version_bump.sh` still emit a legacy date-based `YYYY.M.D` version and predate release-please — don't use them.
 
+**Keep release-please PRs out of the AI PR Review workflow.** The AI PR Review workflow (`ai-pr-review.yaml`) fires on `pull_request` events and would run on release-please PRs too, whose head branch is `release-please--branches--main`; its run reported `action_required` with no jobs and no retrievable logs (issue #106 — PR #57 was blocked for ~24 days with `action_required` checks while every self-hosted install kept running a stale build). The `review` job's `if:` guard skips heads whose branch starts with `release-please` (mirroring `ci.yml`'s `startsWith` checks), so release-please PRs only ever report the meaningful `Lint and Test` check. If the guard regresses, every release-please PR becomes unmergeable the same way — and the PRs' CI runs (which do have real jobs) must stay green for the autorelease bot to merge.
+
 ---
 
 ## What to Flag
