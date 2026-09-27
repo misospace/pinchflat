@@ -21,6 +21,9 @@ defmodule Pinchflat.Repo.Migrations.AddRouteTokenToSettings do
       add :route_token, :string
     end
 
-    execute "UPDATE settings SET route_token = gen_random_uuid() WHERE route_token IS NULL;", "SELECT 1;"
+    execute(
+      "UPDATE settings SET route_token = gen_random_uuid() WHERE route_token IS NULL;",
+      "SELECT 1;"
+    )
   end
 end
