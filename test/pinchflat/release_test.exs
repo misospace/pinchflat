@@ -66,6 +66,17 @@ defmodule Pinchflat.ReleaseTest do
     end
   end
 
+  describe "route_token migration" do
+    test "no settings row carries the tmp-token sentinel" do
+      assert count_settings_with_route_token("tmp-token") == 0
+    end
+
+    test "the route_token column carries no default literal" do
+      assert column_exists?("settings", "route_token")
+      assert is_nil(column_route_token_default())
+    end
+  end
+
   defp column_exists?(table, column) do
     %{rows: rows} = Ecto.Adapters.SQL.query!(Pinchflat.Repo, "SELECT name FROM pragma_table_info(?)", [table])
 
@@ -77,5 +88,19 @@ defmodule Pinchflat.ReleaseTest do
       Ecto.Adapters.SQL.query!(Pinchflat.Repo, "SELECT count(*) FROM schema_migrations WHERE version = ?", [version])
 
     count > 0
+  end
+
+  defp count_settings_with_route_token(token) do
+    %{rows: [[count]]} =
+      Ecto.Adapters.SQL.query!(Pinchflat.Repo, "SELECT count(*) FROM settings WHERE route_token = ?", [token])
+
+    count
+  end
+
+  defp column_route_token_default do
+    sql = "SELECT dflt_value FROM pragma_table_info('settings') WHERE name = ?"
+    %{rows: [[value | _rest]]} = Ecto.Adapters.SQL.query!(Pinchflat.Repo, sql, ["route_token"])
+
+    value
   end
 end
