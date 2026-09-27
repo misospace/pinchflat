@@ -19,6 +19,8 @@ defmodule Pinchflat.ReleaseTest do
 
   @fork_versions [20_260_618_215_000, 20_260_625_174_920, 20_260_629_120_000]
 
+  @route_token_migration "priv/repo/migrations/20241230192618_add_route_token_to_settings.exs"
+
   describe "prep_for_upstream/0" do
     test "drops every fork-only column so the schema matches upstream" do
       for {table, column} <- @fork_columns do
@@ -67,13 +69,27 @@ defmodule Pinchflat.ReleaseTest do
   end
 
   describe "route_token migration" do
-    test "no settings row carries the tmp-token sentinel" do
+    # Static check: reads the migration source rather than the live schema, so it
+    # holds regardless of when this database was last migrated. The guard against
+    # reintroducing the guessable OPML access-key sentinel must not depend on
+    # whether the edited migration happens to have run against this DB.
+    test "adds route_token with no sentinel default and no NOT NULL" do
+      add_line = @route_token_migration |> File.stream!() |> Enum.find(&(&1 =~ ~r/add\s+:route_token\b/))
+
+      assert is_binary(add_line), "expected the migration to add the route_token column"
+      refute add_line =~ "default:"
+      refute add_line =~ "null: false"
+    end
+
+    test "backfills route_token with a UUID, never the sentinel" do
+      assert File.read!(@route_token_migration) =~ "gen_random_uuid()"
       assert count_settings_with_route_token("tmp-token") == 0
     end
 
-    test "the route_token column carries no default literal" do
+    test "route_token exists as a column on a migrated database" do
+      # `mix test` creates and migrates a fresh database (CI), so this exercises
+      # the edited migration end to end rather than whatever a stale dev DB has.
       assert column_exists?("settings", "route_token")
-      assert is_nil(column_route_token_default())
     end
   end
 
@@ -95,12 +111,5 @@ defmodule Pinchflat.ReleaseTest do
       Ecto.Adapters.SQL.query!(Pinchflat.Repo, "SELECT count(*) FROM settings WHERE route_token = ?", [token])
 
     count
-  end
-
-  defp column_route_token_default do
-    sql = "SELECT dflt_value FROM pragma_table_info('settings') WHERE name = ?"
-    %{rows: [[value | _rest]]} = Ecto.Adapters.SQL.query!(Pinchflat.Repo, sql, ["route_token"])
-
-    value
   end
 end
