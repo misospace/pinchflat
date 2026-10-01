@@ -106,7 +106,7 @@ jobs:
 
   merge:
     name: Merge and Push Manifest
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build
     permissions:
       contents: read
