@@ -15,13 +15,14 @@
   tools: [
     {:compiler, env: %{"MIX_ENV" => "test"}},
     {:formatter, env: %{"MIX_ENV" => "test"}},
-    # Overrides ex_check's built-in `mix_audit` tool (a bare `mix deps.audit`
-    # would otherwise run too). The four ignored advisories are all hackney,
-    # with no patched release below 4.0.1 (a major that doesn't exist yet) —
-    # tzdata pins hackney to ~> 1.17, so they're unfixable by upgrade today.
-    # Tracked in https://github.com/advisories/GHSA-gp9c-pm5m-5cxr.
-    {:mix_audit,
-     "mix deps.audit --ignore-advisory-ids GHSA-mp55-p8c9-rfw2,GHSA-pj7v-xfvx-wmjq,GHSA-j9wq-vxxc-94wf,GHSA-gp9c-pm5m-5cxr"},
+    # Keep the Mix and Hex advisory databases as separate checks. Cowboy rejects
+    # invalid response headers by default, and we do not encode structured header
+    # strings or call cow_cookie:cookie/1. Revisit if any of those paths change.
+    {:hex_audit, "mix hex.audit",
+     env: %{
+       "HEX_IGNORE_ADVISORIES" => "GHSA-w4f7-4cxr-rv3c,GHSA-g2wm-735q-3f56"
+     }},
+    {:mix_audit, "mix deps.audit"},
     {:sobelow, "mix sobelow --config"},
     {:prettier_formatting, "yarn run lint:check", fix: "yarn run lint:fix"},
     {:npm_test, false},
