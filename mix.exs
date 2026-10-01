@@ -83,7 +83,7 @@ defmodule Pinchflat.MixProject do
       {:mox, "~> 1.0", only: :test},
       {:credo, "~> 1.7.7", only: [:dev, :test], runtime: false},
       {:credo_naming, "~> 2.1", only: [:dev, :test], runtime: false},
-      {:ex_check, "~> 0.16.0", only: [:dev, :test], runtime: false},
+      {:ex_check, "~> 0.17.0", only: [:dev, :test], runtime: false},
       {:faker, "~> 0.19", only: :test},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
