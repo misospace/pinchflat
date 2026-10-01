@@ -151,7 +151,7 @@ CI is `.github/workflows/ci.yml`, job name **"Lint and Test"** — the only requ
 mix check --no-fix --no-retry
 ```
 
-`mix check` is aliased to `check --config=tooling/.check.exs` (`mix.exs`), which enables, in order: `compiler`, `formatter`, `mix_audit` (`mix deps.audit`), `sobelow`, `prettier_formatting` (`yarn run lint:check`), and `ex_unit` with `EX_CHECK=1`.
+`mix check` is aliased to `check --config=tooling/.check.exs` (`mix.exs`), which enables, in order: `compiler`, `formatter`, `hex_audit` (`mix hex.audit`), `mix_audit` (`mix deps.audit`), `sobelow`, `prettier_formatting` (`yarn run lint:check`), and `ex_unit` with `EX_CHECK=1`. The Hex audit ignores only Cowlib advisories `GHSA-w4f7-4cxr-rv3c` and `GHSA-g2wm-735q-3f56` via `HEX_IGNORE_ADVISORIES` scoped to that check. The current stack retains Cowboy's invalid-response-header termination and does not encode structured header strings or call `cow_cookie:cookie/1`; reassess both exceptions if those paths change.
 
 The external automation gate runs these four separately from a clone at `/work`, in a container, as a non-root uid. **All four are green today (1208 tests, 0 failures) — a PR that breaks one is the PR's fault, not flake:**
 
