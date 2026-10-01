@@ -134,6 +134,7 @@ Standard Phoenix + LiveView. Routes in `lib/pinchflat_web/router.ex`; controller
 - The `strip_trailing_extension` plug in `endpoint.ex` allows media streaming URLs with extensions
 - 404/500 pages render through a dedicated standalone layout (`components/layouts/error.html.heex`, set as `render_errors` `root_layout`), deliberately free of flash, LiveView, and `Settings.get!` DB calls so error rendering can't crash mid-render
 - `Plug.Static` pairs `only:` with `only_matching: ~w(favicon apple-touch-icon)` because `~p` emits digested filenames in prod that a literal `only:` match would reject
+- The `/live` websocket explicitly sets `check_csrf: true` (Phoenix's existing default) and retains session `connect_info`; keep both settings visible. The development-only `/phoenix/live_reload/socket` checks origin against its request connection, which may reject a TLS-terminating dev proxy unless it forwards the public host, scheme, and port. Production's global `check_origin: false` remains unchanged for reverse-proxy deployments where the public host differs from the app's configured host
 
 ### Configuration injection
 
