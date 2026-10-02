@@ -72,7 +72,11 @@ defmodule Pinchflat.MixProject do
       {:finch, "~> 0.24"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.1"},
-      {:gettext, "~> 1.0"},
+      # timex 3.7.13 (latest, and effectively unmaintained) pins gettext ~> 0.26,
+      # so it blocks gettext 1.x. Gettext 1.0 is non-breaking from 0.26 and timex's
+      # translation output is byte-identical under 1.0.2, so the override is safe.
+      # Drop it once timex allows gettext 1.x or is removed.
+      {:gettext, "~> 1.0", override: true},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3"},
       {:plug_cowboy, "~> 2.5"},
