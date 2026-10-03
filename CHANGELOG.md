@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.4.7](https://github.com/misospace/pinchflat/compare/v1.4.6...v1.4.7) (2026-10-03)
+
+
+### Bug Fixes
+
+* stop the OPML access key from ever defaulting to "tmp-token" ([#113](https://github.com/misospace/pinchflat/issues/113)) ([d923a8c](https://github.com/misospace/pinchflat/commit/d923a8c9923ff85e9e803ed4f619fcd569295e12))
+
+
+### Chores
+
+* **ai-review:** upgrade reviewer to v3.2.0 ([#136](https://github.com/misospace/pinchflat/issues/136)) ([d30b713](https://github.com/misospace/pinchflat/commit/d30b713415d9e8391cb55e92b35284d84eb21ba8))
+* **ci:** format AI review workflow ([#131](https://github.com/misospace/pinchflat/issues/131)) ([5d55c74](https://github.com/misospace/pinchflat/commit/5d55c745acec4df1fcec7acd937f88927d2f9c1a))
+* **deps:** remove vulnerable hackney dependency ([#133](https://github.com/misospace/pinchflat/issues/133)) ([572664c](https://github.com/misospace/pinchflat/commit/572664cd5c37f584737bf4563de8f44d0578ffb7))
+* **deps:** update dependency alpinejs to v3.17.4 ([#118](https://github.com/misospace/pinchflat/issues/118)) ([0e83b3b](https://github.com/misospace/pinchflat/commit/0e83b3b832ac9fff99d2ad6038d848448220d95c))
+* **deps:** update dependency dns_cluster to v0.3.1 ([#132](https://github.com/misospace/pinchflat/issues/132)) ([30fbeb1](https://github.com/misospace/pinchflat/commit/30fbeb126434e255b88b6bae0e194f1c42b256c3))
+* **deps:** update dependency ecto_sqlite3 to ~&gt; 0.25.0 ([#124](https://github.com/misospace/pinchflat/issues/124)) ([1df7702](https://github.com/misospace/pinchflat/commit/1df7702f3108d2acaa4bfda5753d20e138a1d266))
+* **deps:** update dependency ex_check to ~&gt; 0.17.0 ([#125](https://github.com/misospace/pinchflat/issues/125)) ([b2955c5](https://github.com/misospace/pinchflat/commit/b2955c528310c178f3b303b1a1c484f59bff9d97))
+* **deps:** update dependency finch to ~&gt; 0.24 ([#126](https://github.com/misospace/pinchflat/issues/126)) ([190d384](https://github.com/misospace/pinchflat/commit/190d384b5f0220d585b327a122ec509d2b54ff19))
+* **deps:** update dependency gettext to v1 ([#128](https://github.com/misospace/pinchflat/issues/128)) ([ce2e227](https://github.com/misospace/pinchflat/commit/ce2e227059e9beddbbb2c359eb2a27c386589dc4))
+* **deps:** update dependency phoenix to v1.8.15 ([#120](https://github.com/misospace/pinchflat/issues/120)) ([87fee83](https://github.com/misospace/pinchflat/commit/87fee83f3b1faf3c4990093124f0fd5520eb3ee6))
+* **deps:** update dependency phoenix_live_view to v1.2.12 ([#121](https://github.com/misospace/pinchflat/issues/121)) ([ea12d7c](https://github.com/misospace/pinchflat/commit/ea12d7cfbd54e33ffe0eec54751abe9bad4bd9ea))
+* **deps:** update dependency prettier to v3.9.9 ([#122](https://github.com/misospace/pinchflat/issues/122)) ([deb65c9](https://github.com/misospace/pinchflat/commit/deb65c94bf007a093403b741cf0d4eaaa92102a8))
+* **deps:** update dependency sobelow to ~&gt; 0.16 ([#127](https://github.com/misospace/pinchflat/issues/127)) ([a1e1664](https://github.com/misospace/pinchflat/commit/a1e1664ee4728134dd02645c65eeaa4401f51615))
+* **deps:** update dependency swoosh to v1.28.1 ([#123](https://github.com/misospace/pinchflat/issues/123)) ([e088256](https://github.com/misospace/pinchflat/commit/e0882565e65068c396466fab73f9c80c3d6f065e))
+* **deps:** update dependency ubuntu to v26 ([#129](https://github.com/misospace/pinchflat/issues/129)) ([a006519](https://github.com/misospace/pinchflat/commit/a006519554399c4677a8c7779da123f7de865e62))
+* **deps:** update github actions ([#117](https://github.com/misospace/pinchflat/issues/117)) ([d9d6ca1](https://github.com/misospace/pinchflat/commit/d9d6ca1aed6857562f6529de5f8204fbaf58a0ca))
+* **security:** declare websocket protections ([#134](https://github.com/misospace/pinchflat/issues/134)) ([fc851bd](https://github.com/misospace/pinchflat/commit/fc851bdf33403eb7c52f93de4348445c8820f8f5))
+
 ## [1.4.6](https://github.com/misospace/pinchflat/compare/v1.4.5...v1.4.6) (2026-09-17)
 
 
