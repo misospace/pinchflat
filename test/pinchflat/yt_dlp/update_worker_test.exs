@@ -183,10 +183,6 @@ defmodule Pinchflat.YtDlp.UpdateWorkerTest do
     end
   end
 
-  defp stub_latest_stable(version) do
-    expect(HTTPClientMock, :get, fn _url, _headers -> {:ok, Jason.encode!(%{"tag_name" => version})} end)
-  end
-
   # The policy and version are validated together, mirroring how the settings
   # form submits both fields in a single changeset.
   defp pin_to_version(version) do

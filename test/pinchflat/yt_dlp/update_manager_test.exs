@@ -64,6 +64,10 @@ defmodule Pinchflat.YtDlp.UpdateManagerTest do
       Settings.set(yt_dlp_update_policy: "nightly_frozen")
       Settings.set(yt_dlp_nightly_baseline: nil)
       expect(YtDlpRunnerMock, :update, fn "nightly" -> {:error, "no internet"} end)
+      # `refresh_installed_version/0` still calls `version/0` after a failed
+      # jump so the saved `yt_dlp_version` can be corrected from drift; stub
+      # it with a read failure to mirror the `run_scheduled_update` failing case.
+      expect(YtDlpRunnerMock, :version, fn -> {:error, "no binary"} end)
 
       assert {:error, {:update_failed, "nightly", "no internet"}} =
                UpdateManager.apply_policy()
@@ -133,11 +137,5 @@ defmodule Pinchflat.YtDlp.UpdateManagerTest do
       assert {:ok, "stable"} = Settings.get(:yt_dlp_update_policy)
       assert {:ok, nil} = Settings.get(:yt_dlp_nightly_baseline)
     end
-  end
-
-  defp stub_latest_stable(version) do
-    expect(HTTPClientMock, :get, fn _url, _headers ->
-      {:ok, Jason.encode!(%{"tag_name" => version})}
-    end)
   end
 end

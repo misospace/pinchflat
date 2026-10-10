@@ -66,4 +66,14 @@ defmodule Pinchflat.TestingHelperMethods do
     File.mkdir_p!(Application.get_env(:pinchflat, :extras_directory))
     File.mkdir_p!(Application.get_env(:pinchflat, :tmpfile_directory))
   end
+
+  # Stubs the GitHub release-lookup HTTP response used by
+  # `Pinchflat.YtDlp.ReleaseLookup.latest_stable_version/0` to return the given
+  # yt-dlp release tag. Tests pin this to a known version so the manager's
+  # "stable caught up to baseline" comparison is deterministic.
+  def stub_latest_stable(version) do
+    expect(HTTPClientMock, :get, fn _url, _headers ->
+      {:ok, Jason.encode!(%{"tag_name" => version})}
+    end)
+  end
 end
