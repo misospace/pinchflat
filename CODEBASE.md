@@ -166,15 +166,15 @@ esbuild and Tailwind are driven through Mix aliases defined in `mix.exs`, not st
 
 All workflows are CI/release only — they are never run locally.
 
-| File                   | Purpose                                                                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `ci-base.yml`          | CI Base Image — builds and pushes the shared `pinchflat-ci-base` toolchain image (amd64 + arm64) to GHCR                         |
-| `ci.yml`               | PR pipeline — linting + tests, builds the PR image (saved as an artifact) and the RC image (pushed to GHCR)                      |
-| `pr-image-publish.yml` | Publish PR Image — pushes the PR image artifact built by `ci.yml` to GHCR from the trusted base-repo context                     |
-| `release-image.yml`    | Release Image — builds and pushes the selfhosted release image to GHCR (auto after the CI base, or manually for an explicit ref) |
-| `release-please.yml`   | Release Please — runs tests, invokes Release-Please, builds and pushes the multi-arch release image to GHCR                      |
-| `image-cleanup.yml`    | Dev Image Cleanup — deletes old dev images (dispatch-only in this snapshot repo)                                                 |
-| `ai-pr-review.yaml`    | AI PR Review — automated AI review of pull requests                                                                              |
+| File                   | Purpose                                                                                                                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci-base.yml`          | CI Base Image — builds and pushes the shared `pinchflat-ci-base` toolchain image (amd64 + arm64) to GHCR                                                                                  |
+| `ci.yml`               | PR pipeline — linting + tests, builds the PR image (saved as an artifact) and the RC image (pushed to GHCR)                                                                               |
+| `pr-image-publish.yml` | Publish PR Image — validates the `pr-image` artifact metadata against trusted GitHub run/PR data before pushing the PR image built by `ci.yml` to GHCR from the trusted base-repo context |
+| `release-image.yml`    | Release Image — builds and pushes the selfhosted release image to GHCR (auto after the CI base, or manually for an explicit ref)                                                          |
+| `release-please.yml`   | Release Please — runs tests, invokes Release-Please, builds and pushes the multi-arch release image to GHCR                                                                               |
+| `image-cleanup.yml`    | Dev Image Cleanup — deletes old dev images (dispatch-only in this snapshot repo)                                                                                                          |
+| `ai-pr-review.yaml`    | AI PR Review — automated AI review of pull requests                                                                                                                                       |
 
 ---
 
@@ -224,17 +224,19 @@ All test infrastructure is used in both local dev and CI.
 
 ## Misc
 
-| File/Dir                                 | Used in    | Purpose                                                                                                                                                               |
-| ---------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `priv/repo/extensions/sqlean-linux-arm/` | CI/release | SQLean SQLite extensions (ARM64) — fetched by `tooling/fetch-sqlean.sh`, not committed (gitignored)                                                                   |
-| `priv/repo/extensions/sqlean-linux-x86/` | CI/release | SQLean SQLite extensions (x86-64) — fetched by `tooling/fetch-sqlean.sh`, not committed (gitignored)                                                                  |
-| `tooling/fetch-sqlean.sh`                | both       | Downloads the pinned SQLean release (`SQLEAN_VERSION`, Renovate-tracked) into `priv/repo/extensions/`; run by `mix setup` and the Docker builder before `mix release` |
-| `priv/repo/seeds.exs`                    | local only | Database seed script                                                                                                                                                  |
-| `priv/repo/erd.png`                      | local only | Entity-Relationship Diagram (generated via `yarn run create-erd`)                                                                                                     |
-| `priv/cmd_wrapper.sh`                    | CI/release | Shell wrapper used around external commands (yt-dlp, apprise) at runtime                                                                                              |
-| `.dockerignore`                          | CI/release | Docker build ignore list                                                                                                                                              |
-| `.gitignore`                             | local only | Git ignore list                                                                                                                                                       |
-| `CONTRIBUTING.md`                        | —          | Contribution guidelines                                                                                                                                               |
-| `LICENSE`                                | —          | Project license                                                                                                                                                       |
-| `.github/ISSUE_TEMPLATE/`                | —          | Bug report, feature request, and other issue templates                                                                                                                |
-| `.github/pull_request_template.md`       | —          | PR description template with license acknowledgment                                                                                                                   |
+| File/Dir                                 | Used in    | Purpose                                                                                                                                                                                                  |
+| ---------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `priv/repo/extensions/sqlean-linux-arm/` | CI/release | SQLean SQLite extensions (ARM64) — fetched by `tooling/fetch-sqlean.sh`, not committed (gitignored)                                                                                                      |
+| `priv/repo/extensions/sqlean-linux-x86/` | CI/release | SQLean SQLite extensions (x86-64) — fetched by `tooling/fetch-sqlean.sh`, not committed (gitignored)                                                                                                     |
+| `tooling/fetch-sqlean.sh`                | both       | Downloads the pinned SQLean release (`SQLEAN_VERSION`, Renovate-tracked) into `priv/repo/extensions/`; run by `mix setup` and the Docker builder before `mix release`                                    |
+| `tooling/pr_image_metadata.sh`           | CI/release | Fail-closed validator gating `pr-image-publish.yml`: rejects `pr-image` artifact metadata (`meta/pr`, `meta/sha`) that doesn't match the trusted PR number/head SHA from GitHub run/PR data (issue #139) |
+| `tooling/test_pr_image_metadata.sh`      | CI/release | Regression suite for the metadata validator, run by `ci.yml`'s test job so a broken validator fails the ordinary PR gate, not the publisher                                                              |
+| `priv/repo/seeds.exs`                    | local only | Database seed script                                                                                                                                                                                     |
+| `priv/repo/erd.png`                      | local only | Entity-Relationship Diagram (generated via `yarn run create-erd`)                                                                                                                                        |
+| `priv/cmd_wrapper.sh`                    | CI/release | Shell wrapper used around external commands (yt-dlp, apprise) at runtime                                                                                                                                 |
+| `.dockerignore`                          | CI/release | Docker build ignore list                                                                                                                                                                                 |
+| `.gitignore`                             | local only | Git ignore list                                                                                                                                                                                          |
+| `CONTRIBUTING.md`                        | —          | Contribution guidelines                                                                                                                                                                                  |
+| `LICENSE`                                | —          | Project license                                                                                                                                                                                          |
+| `.github/ISSUE_TEMPLATE/`                | —          | Bug report, feature request, and other issue templates                                                                                                                                                   |
+| `.github/pull_request_template.md`       | —          | PR description template with license acknowledgment                                                                                                                                                      |
