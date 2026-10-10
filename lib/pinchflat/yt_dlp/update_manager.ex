@@ -16,6 +16,11 @@ defmodule Pinchflat.YtDlp.UpdateManager do
       passes) the nightly we landed on
     - `"pinned"` - install one exact version (`yt_dlp_pinned_version`) and hold
       there, re-asserting it on boot so an image swap can't drift it
+
+  Both public entrypoints (`run_scheduled_update/0` and `apply_policy/0`) return
+  `:ok` for successful or deliberately no-op behaviour, and `{:error, reason}`
+  when a yt-dlp update itself fails. The update worker propagates that error so
+  Oban can record and retry it.
   """
 
   require Logger
@@ -48,59 +53,75 @@ defmodule Pinchflat.YtDlp.UpdateManager do
   Re-asserting on every boot trues the binary back up to the version the
   settings say we should be on (yt-dlp no-ops cheaply if it already matches).
 
-  Returns :ok
+  Returns `:ok` for successful or deliberately no-op behaviour, and
+  `{:error, reason}` when a yt-dlp update fails so the caller can surface
+  the failure to Oban.
   """
   def run_scheduled_update do
-    case Settings.get!(:yt_dlp_update_policy) do
-      "stable" ->
-        update_to_stable()
+    result =
+      case Settings.get!(:yt_dlp_update_policy) do
+        "stable" ->
+          update_to_stable()
 
-      "nightly" ->
-        update_to("nightly")
+        "nightly" ->
+          update_to("nightly")
 
-      "nightly_until_stable" ->
-        maybe_revert_to_stable()
+        "nightly_until_stable" ->
+          maybe_revert_to_stable()
 
-      "nightly_frozen" ->
-        reassert_frozen_nightly()
+        "nightly_frozen" ->
+          reassert_frozen_nightly()
 
-      "pinned" ->
-        reassert_pinned_version()
+        "pinned" ->
+          reassert_pinned_version()
 
-      _unknown ->
-        :noop
-    end
+        _unknown ->
+          :ok
+      end
 
     refresh_installed_version()
-    :ok
+    result_or_error(result)
   end
 
   @doc """
   Applies the currently-saved policy immediately, performing the one-shot jump
   to the target channel/version. Called right after the user saves the setting.
 
-  Returns :ok
+  For the held nightly policies (`nightly_frozen`, `nightly_until_stable`), the
+  nightly baseline is recorded only after the jump itself succeeds - a failed
+  jump leaves the previously installed binary in place and reading its version
+  back as the new baseline would pin the held build to whatever was already
+  there.
+
+  Returns `:ok` for successful or deliberately no-op behaviour, and
+  `{:error, reason}` when a yt-dlp update fails so the caller can surface
+  the failure to Oban.
   """
   def apply_policy do
-    case Settings.get!(:yt_dlp_update_policy) do
-      "stable" ->
-        update_to_stable()
+    result =
+      case Settings.get!(:yt_dlp_update_policy) do
+        "stable" ->
+          update_to_stable()
 
-      "nightly" ->
-        update_to("nightly")
+        "nightly" ->
+          update_to("nightly")
 
-      # Record which nightly we landed on so a later boot can true the binary
-      # back up to this exact build instead of drifting to the latest nightly.
-      channel when channel in ["nightly_frozen", "nightly_until_stable"] ->
-        update_to("nightly")
-        capture_nightly_baseline()
+        # Record which nightly we landed on so a later boot can true the binary
+        # back up to this exact build instead of drifting to the latest nightly.
+        # Capture is conditional: if the jump failed, the binary is still the
+        # previously installed version, and recording that as the new baseline
+        # would strangle the held build to whatever was already there.
+        channel when channel in ["nightly_frozen", "nightly_until_stable"] ->
+          with {:ok, _} <- update_to("nightly") do
+            capture_nightly_baseline()
+          end
 
-      "pinned" ->
-        reassert_pinned_version()
-    end
+        "pinned" ->
+          reassert_pinned_version()
+      end
 
     refresh_installed_version()
-    :ok
+    result_or_error(result)
   end
 
   defp reassert_pinned_version do
@@ -118,7 +139,7 @@ defmodule Pinchflat.YtDlp.UpdateManager do
       # We don't know which nightly was frozen (e.g. set before this was
       # tracked), so there's nothing safe to re-assert. Leave the binary as-is.
       _blank ->
-        :noop
+        :ok
     end
   end
 
@@ -129,9 +150,16 @@ defmodule Pinchflat.YtDlp.UpdateManager do
       {:ok, stable_version} ->
         if VersionUtils.compare(stable_version, baseline) in [:eq, :gt] do
           Logger.info("Stable yt-dlp #{stable_version} caught up to nightly #{baseline}; reverting to stable")
-          update_to(stable_version)
-          Settings.set(yt_dlp_update_policy: "stable")
-          Settings.set(yt_dlp_nightly_baseline: nil)
+
+          # Only commit the policy transition and clear the baseline once the
+          # stable installation itself succeeds. Otherwise a failed install
+          # would leave us nominally on `stable` but actually still on the
+          # previously held nightly build.
+          with {:ok, _} <- update_to(stable_version),
+               {:ok, _} <- Settings.set(yt_dlp_update_policy: "stable"),
+               {:ok, _} <- Settings.set(yt_dlp_nightly_baseline: nil) do
+            :ok
+          end
         else
           Logger.info("Holding yt-dlp on nightly #{baseline}; latest stable #{stable_version} hasn't caught up")
           reassert_frozen_nightly()
@@ -146,7 +174,7 @@ defmodule Pinchflat.YtDlp.UpdateManager do
   defp capture_nightly_baseline do
     case yt_dlp_runner().version() do
       {:ok, version} -> Settings.set(yt_dlp_nightly_baseline: version)
-      _error -> :noop
+      _error -> :ok
     end
   end
 
@@ -177,18 +205,22 @@ defmodule Pinchflat.YtDlp.UpdateManager do
       {:ok, _output} = result ->
         result
 
-      {:error, reason} = error ->
+      {:error, reason} ->
         Logger.error("yt-dlp update to '#{target}' failed: #{inspect(reason)}")
-        error
+        {:error, {:update_failed, target, reason}}
     end
   end
 
   defp refresh_installed_version do
     case yt_dlp_runner().version() do
       {:ok, version} -> Settings.set(yt_dlp_version: version)
-      _error -> :noop
+      _error -> :ok
     end
   end
+
+  defp result_or_error(:ok), do: :ok
+  defp result_or_error({:ok, _}), do: :ok
+  defp result_or_error({:error, _} = error), do: error
 
   defp yt_dlp_runner do
     Application.get_env(:pinchflat, :yt_dlp_runner)
