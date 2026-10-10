@@ -50,6 +50,12 @@ jobs:
           rm -rf /app
           ln -s "$GITHUB_WORKSPACE" /app
 
+      # The privileged pr-image-publish workflow validates this artifact metadata
+      # with tooling/pr_image_metadata.sh; run its regression suite here so a
+      # broken validator fails the ordinary PR gate, not the publisher (issue #139).
+      - name: Test PR image metadata validation
+        run: bash tooling/test_pr_image_metadata.sh
+
       # Cache compiled deps and node_modules keyed on the lockfiles. Unlike the
       # old Docker-layer cache (which rarely hit), this restores the actual
       # deps/_build/node_modules dirs the steps below read from.
