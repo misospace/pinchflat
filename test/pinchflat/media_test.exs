@@ -844,6 +844,35 @@ defmodule Pinchflat.MediaTest do
     end
   end
 
+  describe "delete_media_item/2 when a file cannot be removed" do
+    test "returns the removal error and leaves the record in place" do
+      media_item = media_item_with_attachments()
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      assert {:error, {:file_removal_failed, _}} = Media.delete_media_item(media_item, delete_files: true)
+
+      assert Media.get_media_item!(media_item.id)
+      assert File.exists?(undeletable)
+    end
+
+    test "deletes the record anyway when ignore_file_removal_errors is set" do
+      media_item = media_item_with_attachments()
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      assert {:ok, %MediaItem{}} =
+               Media.delete_media_item(media_item, delete_files: true, ignore_file_removal_errors: true)
+
+      assert_raise Ecto.NoResultsError, fn -> Media.get_media_item!(media_item.id) end
+      assert File.exists?(undeletable)
+    end
+  end
+
   describe "delete_media_files/2" do
     setup do
       stub(UserScriptRunnerMock, :run, fn _event_type, _data -> {:ok, "", 0} end)
@@ -913,6 +942,78 @@ defmodule Pinchflat.MediaTest do
       end)
 
       assert {:ok, _} = Media.delete_media_files(media_item)
+    end
+
+    test "resets the filepath attributes when the only missing file was already gone" do
+      media_item = media_item_with_attachments()
+
+      missing_filepath = Path.join(Path.dirname(media_item.media_filepath), "already-gone.mp4")
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: missing_filepath})
+
+      expect(UserScriptRunnerMock, :run, fn :media_deleted, data ->
+        assert data.id == media_item.id
+
+        {:ok, "", 0}
+      end)
+
+      assert {:ok, updated_media_item} = Media.delete_media_files(media_item)
+
+      assert updated_media_item.media_filepath == nil
+      assert updated_media_item.thumbnail_filepath == nil
+      assert updated_media_item.subtitle_filepaths == []
+    end
+  end
+
+  describe "delete_media_files/2 when a file cannot be removed" do
+    test "returns the removal error and leaves the filepath references in place" do
+      media_item = media_item_with_attachments()
+      original_thumbnail = media_item.thumbnail_filepath
+      original_subtitle_filepaths = media_item.subtitle_filepaths
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      assert {:error, {:file_removal_failed, failures}} = Media.delete_media_files(media_item)
+      assert [{^undeletable, reason}] = failures
+      refute reason == :enoent
+
+      reloaded = Repo.reload!(media_item)
+      assert reloaded.media_filepath == undeletable
+      assert reloaded.thumbnail_filepath == original_thumbnail
+      assert reloaded.subtitle_filepaths == original_subtitle_filepaths
+    end
+
+    test "still removes the other files so a retry can finish" do
+      media_item = media_item_with_attachments()
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      assert {:error, {:file_removal_failed, _}} = Media.delete_media_files(media_item)
+
+      refute File.exists?(media_item.thumbnail_filepath)
+
+      reloaded = Repo.reload!(media_item)
+      assert reloaded.media_filepath == undeletable
+      assert reloaded.thumbnail_filepath == media_item.thumbnail_filepath
+    end
+
+    test "logs a warning naming the file it could not remove" do
+      media_item = media_item_with_attachments()
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      log =
+        ExUnit.CaptureLog.capture_log([level: :warning], fn ->
+          assert {:error, {:file_removal_failed, _}} = Media.delete_media_files(media_item)
+        end)
+
+      assert log =~ "Failed to remove"
+      assert log =~ undeletable
     end
   end
 

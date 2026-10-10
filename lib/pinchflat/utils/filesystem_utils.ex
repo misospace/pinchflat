@@ -132,14 +132,12 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   and silent accumulation of empty parent directories is the failure mode
   this function exists to prevent, not to surface to upstream callers.
 
-  Callers: `Media.delete_media_item/2`, `Media.delete_media_files/2`,
-  `Media.delete_internal_metadata_files/1`, `Sources.delete_source/2`,
+  Callers: `Media.delete_media_files/2` and `Media.delete_media_item/2` treat
+  `:enoent` as success, and for any other reason log a warning and return
+  `{:error, {:file_removal_failed, [{filepath, reason}]}}` — the latter, unless told
+  to `ignore_file_removal_errors`. The discarding callers are
   `Sources.delete_source_files/1`, `Sources.delete_internal_metadata_files/1`,
-  and `FileSyncing.handle_file_deletion/2`. None of these inspect the return
-  value — every call site is either a discarded `Enum.each/2` callback
-  or a discarded expression in an `if` block — so the
-  `:ok`-on-partial-cleanup-failure contract is preserved without any
-  observable contract change for upstream callers.
+  `Media.delete_internal_metadata_files/1`, and `FileSyncing.handle_file_deletion/2`.
 
   Returns :ok | {:error, any()}
   """

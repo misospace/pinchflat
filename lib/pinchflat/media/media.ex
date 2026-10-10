@@ -6,6 +6,8 @@ defmodule Pinchflat.Media do
   import Ecto.Query, warn: false
   use Pinchflat.Media.MediaQuery
 
+  require Logger
+
   alias Pinchflat.Repo
   alias Pinchflat.Tasks
   alias Pinchflat.Sources.Source
@@ -165,21 +167,30 @@ defmodule Pinchflat.Media do
   Deletes a media_item, its associated tasks, and our internal metadata files.
   Can optionally delete the media_item's media files (media, thumbnail, subtitles, etc).
 
-  Returns {:ok, %MediaItem{}} | {:error, %Ecto.Changeset{}}
+  Options:
+    - `delete_files` (default: false) - also delete the media_item's media files
+    - `ignore_file_removal_errors` (default: false) - when `delete_files` is true and a
+      file cannot be removed, log a warning and delete the record anyway instead of
+      returning the error
+
+  Returns `{:ok, %MediaItem{}}`, or `{:error, %Ecto.Changeset{}}` (from `Repo.delete/1`),
+  or `{:error, {:file_removal_failed, [{filepath, reason}]}}` when `delete_files` is true
+  and one or more files could not be removed. Associated tasks are deleted before any
+  file is touched, so a failed call leaves the record in place with its tasks already
+  gone and the deletion has to be retried by the caller (or, for cullable items, by the
+  next retention run), unless `ignore_file_removal_errors` is true.
   """
   def delete_media_item(%MediaItem{} = media_item, opts \\ []) do
     delete_files = Keyword.get(opts, :delete_files, false)
+    ignore_file_removal_errors = Keyword.get(opts, :ignore_file_removal_errors, false)
 
     Tasks.delete_tasks_for(media_item)
 
-    if delete_files do
-      {:ok, _} = do_delete_media_files(media_item)
-      run_user_script(:media_deleted, media_item)
+    with :ok <- delete_attached_files_if_required(media_item, delete_files, ignore_file_removal_errors) do
+      # Should delete these no matter what
+      delete_internal_metadata_files(media_item)
+      Repo.delete(media_item)
     end
-
-    # Should delete these no matter what
-    delete_internal_metadata_files(media_item)
-    Repo.delete(media_item)
   end
 
   @doc """
@@ -190,16 +201,25 @@ defmodule Pinchflat.Media do
   media_item before it is updated. Useful for setting things like `prevent_download`
   and `culled_at`, if wanted
 
-  Returns {:ok, %MediaItem{}} | {:error, %Ecto.Changeset{}}
+  Returns `{:ok, %MediaItem{}}` with the filepath attributes cleared when every
+  attached file was removed or was already gone, or `{:error, %Ecto.Changeset{}}`
+  (from `update_media_item/2`), or `{:error, {:file_removal_failed, [{filepath, reason}]}}`
+  when a file could not be removed; the record and all of its filepath references are
+  left untouched in that case. Associated tasks are deleted before any file is touched,
+  so a failed call leaves the record in place with its tasks already gone and the
+  deletion has to be retried by the caller (or, for cullable items, by the next
+  retention run).
   """
   def delete_media_files(%MediaItem{} = media_item, addl_attrs \\ %{}) do
     filepath_attrs = MediaItem.filepath_attribute_defaults()
 
     Tasks.delete_tasks_for(media_item)
-    {:ok, _} = do_delete_media_files(media_item)
-    run_user_script(:media_deleted, media_item)
 
-    update_media_item(media_item, Map.merge(filepath_attrs, addl_attrs))
+    with :ok <- do_delete_media_files(media_item) do
+      run_user_script(:media_deleted, media_item)
+
+      update_media_item(media_item, Map.merge(filepath_attrs, addl_attrs))
+    end
   end
 
   @doc """
@@ -212,16 +232,39 @@ defmodule Pinchflat.Media do
   defp do_delete_media_files(media_item) do
     mapped_struct = Map.from_struct(media_item)
 
-    MediaItem.filepath_attributes()
-    |> Enum.map(fn
-      :subtitle_filepaths = field -> Enum.map(mapped_struct[field], fn [_, filepath] -> filepath end)
-      field -> List.wrap(mapped_struct[field])
-    end)
-    |> List.flatten()
-    |> Enum.filter(&is_binary/1)
-    |> Enum.each(&FilesystemUtils.delete_file_and_remove_empty_directories/1)
+    failures =
+      MediaItem.filepath_attributes()
+      |> Enum.map(fn
+        :subtitle_filepaths = field -> Enum.map(mapped_struct[field], fn [_, filepath] -> filepath end)
+        field -> List.wrap(mapped_struct[field])
+      end)
+      |> List.flatten()
+      |> Enum.filter(&is_binary/1)
+      |> Enum.map(&delete_attached_file/1)
+      |> Enum.reject(&(&1 == :ok))
 
-    {:ok, media_item}
+    case failures do
+      [] -> :ok
+      failures -> log_file_removal_failures(media_item, failures)
+    end
+  end
+
+  defp log_file_removal_failures(media_item, failures) do
+    details = Enum.map_join(failures, ", ", fn {filepath, reason} -> "#{filepath} (#{inspect(reason)})" end)
+
+    Logger.warning("Failed to remove #{length(failures)} file(s) for media item #{media_item.id}: #{details}")
+
+    {:error, {:file_removal_failed, failures}}
+  end
+
+  # `:enoent` means the file is already gone — the state we wanted. Treating it as
+  # success is what lets a retry of a partially-failed deletion converge.
+  defp delete_attached_file(filepath) do
+    case FilesystemUtils.delete_file_and_remove_empty_directories(filepath) do
+      :ok -> :ok
+      {:error, :enoent} -> :ok
+      {:error, reason} -> {filepath, reason}
+    end
   end
 
   defp delete_internal_metadata_files(media_item) do
@@ -232,6 +275,26 @@ defmodule Pinchflat.Media do
     |> Enum.map(fn field -> mapped_struct[field] end)
     |> Enum.filter(&is_binary/1)
     |> Enum.each(&FilesystemUtils.delete_file_and_remove_empty_directories/1)
+  end
+
+  defp delete_attached_files_if_required(_media_item, false, _ignore_file_removal_errors), do: :ok
+
+  defp delete_attached_files_if_required(media_item, true, ignore_file_removal_errors) do
+    case do_delete_media_files(media_item) do
+      :ok ->
+        run_user_script(:media_deleted, media_item)
+
+        :ok
+
+      {:error, _} = error ->
+        if ignore_file_removal_errors do
+          Logger.warning("Deleting media item #{media_item.id} anyway, despite file-removal errors")
+
+          :ok
+        else
+          error
+        end
+    end
   end
 
   defp run_user_script(event, media_item) do
