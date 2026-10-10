@@ -3,6 +3,8 @@ defmodule Pinchflat.TestingHelperMethods do
 
   use ExUnit.CaseTemplate
 
+  import Mox
+
   def now do
     DateTime.utc_now()
   end
