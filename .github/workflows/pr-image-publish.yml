@@ -47,10 +47,12 @@ jobs:
         run: |
           set -euo pipefail
           # --paginate --slurp so the count covers every page, not just the
-          # first 30 artifacts a run may have uploaded.
+          # first 30 artifacts a run may have uploaded. gh refuses to combine
+          # --slurp with its own --jq (and would apply --jq per page, not over
+          # the whole set), so an external jq counts pr-image across the pages.
           count=$(gh api --paginate --slurp \
             "repos/${REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
-            --jq '[.[] | .artifacts[] | select(.name == "pr-image")] | length')
+            | jq '[.[] | .artifacts[] | select(.name == "pr-image")] | length')
           if [ "$count" -gt 0 ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
