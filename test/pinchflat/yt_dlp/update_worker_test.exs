@@ -138,8 +138,49 @@ defmodule Pinchflat.YtDlp.UpdateWorkerTest do
     end
   end
 
-  defp stub_latest_stable(version) do
-    expect(HTTPClientMock, :get, fn _url, _headers -> {:ok, Jason.encode!(%{"tag_name" => version})} end)
+  describe "perform/1 propagates manager errors so Oban can retry them" do
+    test "returns {:error, _} when a scheduled nightly update fails" do
+      Settings.set(yt_dlp_update_policy: "nightly")
+      expect(YtDlpRunnerMock, :update, fn "nightly" -> {:error, "no internet"} end)
+      expect(YtDlpRunnerMock, :version, fn -> {:error, "no binary"} end)
+
+      # Previously the worker swallowed the manager result with `:ok`, which
+      # skipped Oban's error/retry path. Propagating the {:error, _} tuple is
+      # what lets Oban mark the job as retryable.
+      assert {:error, {:update_failed, "nightly", "no internet"}} =
+               perform_job(UpdateWorker, %{})
+    end
+
+    test "returns {:error, _} when applying nightly_frozen fails" do
+      Settings.set(yt_dlp_update_policy: "nightly_frozen")
+      Settings.set(yt_dlp_nightly_baseline: "2025.06.28.123456")
+      expect(YtDlpRunnerMock, :update, fn "nightly" -> {:error, "no internet"} end)
+      expect(YtDlpRunnerMock, :version, fn -> {:ok, "2025.06.27"} end)
+
+      assert {:error, {:update_failed, "nightly", "no internet"}} =
+               perform_job(UpdateWorker, %{"apply_policy" => true})
+
+      # The held baseline must survive the failed jump so a future reassert
+      # targets the build we intended to land on.
+      assert {:ok, "2025.06.28.123456"} = Settings.get(:yt_dlp_nightly_baseline)
+    end
+
+    test "returns {:error, _} when nightly_until_stable fails to revert" do
+      Settings.set(yt_dlp_update_policy: "nightly_until_stable")
+      Settings.set(yt_dlp_nightly_baseline: "2025.06.28.123456")
+      stub_latest_stable("2025.07.01")
+      expect(YtDlpRunnerMock, :update, fn "2025.07.01" -> {:error, "no internet"} end)
+      expect(YtDlpRunnerMock, :version, fn -> {:ok, "2025.06.28.123456"} end)
+
+      assert {:error, {:update_failed, "2025.07.01", "no internet"}} =
+               perform_job(UpdateWorker, %{})
+
+      # The transition and baseline clear must not commit when the stable
+      # install fails: keeping the policy `nightly_until_stable` leaves Oban
+      # room to retry on the next cron tick.
+      assert {:ok, "nightly_until_stable"} = Settings.get(:yt_dlp_update_policy)
+      assert {:ok, "2025.06.28.123456"} = Settings.get(:yt_dlp_nightly_baseline)
+    end
   end
 
   # The policy and version are validated together, mirroring how the settings

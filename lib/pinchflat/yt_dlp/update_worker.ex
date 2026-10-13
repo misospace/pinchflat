@@ -40,7 +40,9 @@ defmodule Pinchflat.YtDlp.UpdateWorker do
 
   This worker is scheduled to run via the Oban Cron plugin as well as on app boot.
 
-  Returns :ok
+  Returns `:ok` for successful or deliberately no-op behaviour, and
+  `{:error, reason}` when the yt-dlp update itself fails so Oban can record
+  and retry the failure instead of silently marking the job complete.
   """
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}) do
@@ -49,7 +51,5 @@ defmodule Pinchflat.YtDlp.UpdateWorker do
     else
       UpdateManager.run_scheduled_update()
     end
-
-    :ok
   end
 end
