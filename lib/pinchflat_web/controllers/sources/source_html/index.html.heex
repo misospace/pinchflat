@@ -1,7 +1,11 @@
 <div class="mb-6 flex gap-3 flex-row items-center justify-between">
   <h2 class="text-title-md2 font-bold text-black dark:text-white">Sources</h2>
   <nav class="flex items-center justify-between gap-6">
-    <.link href={opml_feed_url(@conn)} x-data="{ copied: false }" x-on:click={~s"
+    <.link
+      href={opml_feed_url(@conn)}
+      title="The copied URL includes your secret OPML access token. Anyone with this link can list all of your sources."
+      x-data="{ copied: false }"
+      x-on:click={~s"
           $event.preventDefault();
           copyWithCallbacks(
             '#{opml_feed_url(@conn)}',

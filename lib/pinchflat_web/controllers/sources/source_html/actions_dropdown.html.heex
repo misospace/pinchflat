@@ -1,6 +1,10 @@
 <.button_dropdown text="Actions" class="justify-center w-full sm:w-50">
   <:option>
-    <.link href={rss_feed_url(@conn, @source)} x-data="{ copied: false }" x-on:click={~s"
+    <.link
+      href={rss_feed_url(@conn, @source)}
+      title="RSS, image, and media URLs are not token-protected (public when EXPOSE_FEED_ENDPOINTS is enabled)."
+      x-data="{ copied: false }"
+      x-on:click={~s"
           $event.preventDefault();
           copyWithCallbacks(
             '#{rss_feed_url(@conn, @source)}',

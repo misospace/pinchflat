@@ -19,16 +19,20 @@ defmodule PinchflatWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Pipeline for public podcast feed endpoints (RSS, OPML, cover images, media streams).
-  # These intentionally bypass basic auth and need to be embeddable in iframes for podcast
-  # directories — `allow_iframe_embed` strips `x-frame-options` and adds CORS plus the
-  # baseline security headers the `:browser` pipeline's `put_secure_browser_headers` would
-  # otherwise supply. No `:accepts` plug here: these controllers send raw responses, and
-  # podcast readers send varied Accept headers that content negotiation could reject.
+  # Shared response-header pipeline for the public per-source feed endpoints (RSS, cover
+  # images, media streams). It strips `x-frame-options` and adds CORS plus the baseline
+  # security headers the `:browser` pipeline's `put_secure_browser_headers` would otherwise
+  # supply, so the responses are embeddable in podcast directories' iframes. No `:accepts`
+  # plug here: these controllers send raw responses, and podcast readers send varied Accept
+  # headers that content negotiation could reject.
   pipeline :feed do
     plug :allow_iframe_embed
   end
 
+  # OPML-only access-key scope. `token_protected_route` requires the installation's
+  # `route_token` query param (constant-time compare) regardless of basic auth, so the full
+  # source list is never enumerable without the token. The token deliberately does NOT gate
+  # the per-source feed/image/stream routes below (see the `:feed` scope).
   scope "/", PinchflatWeb do
     pipe_through [:maybe_basic_auth, :token_protected_route]
 
@@ -36,8 +40,11 @@ defmodule PinchflatWeb.Router do
     get "/sources/opml", Podcasts.PodcastController, :opml_feed
   end
 
-  # Routes in here _may not be_ protected by basic auth. This is necessary for
-  # media streaming to work for RSS podcast feeds.
+  # Per-source feed scope, gated only by `maybe_basic_auth`. These routes are anonymously
+  # reachable when `expose_feed_endpoints` is true (podcast clients fetch enclosure/artwork
+  # URLs independently of the feed and cannot carry a query-param token). When it is false
+  # they require basic auth only if credentials are configured, and stay anonymous when no
+  # credentials are set. They intentionally do not take `route_token`.
   scope "/", PinchflatWeb do
     pipe_through [:maybe_basic_auth, :feed]
 

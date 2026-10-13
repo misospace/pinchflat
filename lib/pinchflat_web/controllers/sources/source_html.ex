@@ -47,12 +47,25 @@ defmodule PinchflatWeb.Sources.SourceHTML do
     ]
   end
 
+  @doc """
+  Returns the tokenless RSS feed URL for a source.
+
+  RSS/stream/image endpoints are not gated by `route_token`; they are public when
+  `expose_feed_endpoints` is true and otherwise require basic auth when credentials are
+  configured. See `PinchflatWeb.Plugs.maybe_basic_auth/2`.
+  """
   def rss_feed_url(conn, source) do
     # NOTE: The reason for this concatenation is to avoid what appears to be a bug in Phoenix
     # See: https://github.com/phoenixframework/phoenix/issues/6033
     url(conn, ~p"/sources/#{source.uuid}/feed") <> ".xml"
   end
 
+  @doc """
+  Returns the OPML feed URL, including the installation's secret `route_token`.
+
+  The token is the OPML-only access key (see `PinchflatWeb.Plugs.token_protected_route/2`): the
+  full source list is never enumerable without it, regardless of basic auth.
+  """
   def opml_feed_url(conn) do
     url(conn, ~p"/sources/opml.xml?#{[route_token: Settings.get!(:route_token)]}")
   end

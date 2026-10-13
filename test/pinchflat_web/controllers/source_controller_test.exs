@@ -39,6 +39,26 @@ defmodule PinchflatWeb.SourceControllerTest do
       conn = get(conn, ~p"/sources")
       assert html_response(conn, 200) =~ "Sources"
     end
+
+    test "OPML link includes the route token", %{conn: conn} do
+      route_token = Settings.get!(:route_token)
+
+      conn = get(conn, ~p"/sources")
+
+      assert html_response(conn, 200) =~ "route_token=#{route_token}"
+    end
+  end
+
+  describe "show source" do
+    test "RSS link does not include a route token", %{conn: conn} do
+      source = source_fixture()
+
+      conn = get(conn, ~p"/sources/#{source}")
+
+      body = html_response(conn, 200)
+      assert body =~ "/sources/#{source.uuid}/feed.xml"
+      refute body =~ "route_token"
+    end
   end
 
   describe "new source" do
