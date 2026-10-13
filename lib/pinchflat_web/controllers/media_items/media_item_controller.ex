@@ -42,11 +42,23 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
   def delete(conn, %{"id" => id} = params) do
     prevent_download = Map.get(params, "prevent_download", false)
     media_item = Media.get_media_item!(id)
-    {:ok, _} = Media.delete_media_files(media_item, %{prevent_download: prevent_download})
 
-    conn
-    |> put_flash(:info, "Files deleted successfully.")
-    |> redirect(to: ~p"/sources/#{media_item.source_id}")
+    case Media.delete_media_files(media_item, %{prevent_download: prevent_download}) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "Files deleted successfully.")
+        |> redirect(to: ~p"/sources/#{media_item.source_id}")
+
+      {:error, {:file_removal_failed, failures}} ->
+        conn
+        |> put_flash(:error, file_removal_failure_message(failures))
+        |> redirect(to: ~p"/sources/#{media_item.source_id}")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "Failed to delete files.")
+        |> redirect(to: ~p"/sources/#{media_item.source_id}")
+    end
   end
 
   def force_download(conn, %{"media_item_id" => id}) do
@@ -160,5 +172,11 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
       {{start_pos, _}, {end_pos, _}} ->
         {:ok, {start_pos, end_pos}}
     end
+  end
+
+  defp file_removal_failure_message(failures) do
+    details = Enum.map_join(failures, "; ", fn {filepath, reason} -> "#{filepath} (#{inspect(reason)})" end)
+
+    "Failed to delete files: #{details}"
   end
 end

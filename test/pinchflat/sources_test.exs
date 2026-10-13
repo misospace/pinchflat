@@ -6,6 +6,7 @@ defmodule Pinchflat.SourcesTest do
   import Pinchflat.ProfilesFixtures
   import Pinchflat.SourcesFixtures
 
+  alias Pinchflat.Media
   alias Pinchflat.Sources
   alias Pinchflat.Sources.Source
   alias Pinchflat.Utils.FilesystemUtils
@@ -923,6 +924,21 @@ defmodule Pinchflat.SourcesTest do
       assert {:ok, _} = Sources.delete_source(source, delete_files: true)
 
       refute File.exists?(filepath)
+    end
+
+    test "deletes the source when a media item's file cannot be removed" do
+      source = source_fixture()
+      media_item = media_item_with_attachments(%{source_id: source.id})
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      assert {:ok, %Source{}} = Sources.delete_source(source, delete_files: true)
+
+      assert File.exists?(undeletable)
+      assert_raise Ecto.NoResultsError, fn -> Repo.reload!(media_item) end
+      assert_raise Ecto.NoResultsError, fn -> Repo.reload!(source) end
     end
   end
 

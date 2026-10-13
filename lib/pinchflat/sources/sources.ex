@@ -131,7 +131,9 @@ defmodule Pinchflat.Sources do
 
   @doc """
   Deletes a source, its media items, and its associated tasks (of any state).
-  Can optionally delete the source's media files.
+  Can optionally delete the source's media files. Media file deletion is
+  best-effort: if a file cannot be removed, the media item is deleted anyway,
+  since the `media_items.source_id` foreign key is `:restrict`.
 
   Returns {:ok, %Source{}} | {:error, %Ecto.Changeset{}}
   """
@@ -143,7 +145,7 @@ defmodule Pinchflat.Sources do
     |> where(^MediaQuery.for_source(source))
     |> Repo.all()
     |> Enum.each(fn media_item ->
-      Media.delete_media_item(media_item, delete_files: delete_files)
+      Media.delete_media_item(media_item, delete_files: delete_files, ignore_file_removal_errors: true)
     end)
 
     if delete_files do

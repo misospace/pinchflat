@@ -4,6 +4,7 @@ defmodule PinchflatWeb.MediaItemControllerTest do
   import Pinchflat.MediaFixtures
 
   alias Pinchflat.Repo
+  alias Pinchflat.Media
   alias Pinchflat.Downloading.MediaDownloadWorker
 
   describe "show media" do
@@ -93,6 +94,30 @@ defmodule PinchflatWeb.MediaItemControllerTest do
       media_item = Repo.reload(media_item)
 
       assert media_item.prevent_download
+    end
+  end
+
+  describe "delete media with an undeletable file" do
+    setup do
+      media_item = media_item_with_attachments()
+
+      %{media_item: media_item}
+    end
+
+    test "keeps the file reference when removal fails", %{conn: conn, media_item: media_item} do
+      directory = Path.join(Path.dirname(media_item.media_filepath), "undeletable")
+      File.mkdir_p!(directory)
+      File.write!(Path.join(directory, "blocker"), "keeps the directory non-empty")
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: directory})
+
+      conn = delete(conn, ~p"/sources/#{media_item.source_id}/media/#{media_item.id}")
+
+      assert redirected_to(conn) == ~p"/sources/#{media_item.source_id}"
+      assert conn.assigns[:flash]["error"] =~ "Failed to delete"
+      assert conn.assigns[:flash]["error"] =~ directory
+      assert Repo.reload!(media_item).media_filepath == directory
+      assert File.dir?(directory)
+      refute conn.assigns[:flash]["info"]
     end
   end
 
