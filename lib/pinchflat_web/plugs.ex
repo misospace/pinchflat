@@ -7,7 +7,13 @@ defmodule PinchflatWeb.Plugs do
   alias Pinchflat.Settings
 
   @doc """
-  If the `expose_feed_endpoints` setting is true, this plug does nothing. Otherwise, it calls `basic_auth/2`.
+  Gates the per-source feed/stream/image routes.
+
+  If the `expose_feed_endpoints` setting is true, this plug does nothing (the endpoints are
+  public). Otherwise it calls `basic_auth/2`, which is itself a no-op when no basic auth
+  credentials are configured — so with no credentials set, feed endpoints stay anonymous even
+  when `expose_feed_endpoints` is false. This plug does not enforce `route_token`; that token
+  is the OPML-only access key (see `token_protected_route/2`).
   """
   def maybe_basic_auth(conn, opts) do
     if Application.get_env(:pinchflat, :expose_feed_endpoints) do
@@ -76,6 +82,11 @@ defmodule PinchflatWeb.Plugs do
   @doc """
   If the `route_token` query parameter matches the `route_token` setting, this plug does nothing.
   Otherwise, it sends a 401 response.
+
+  This is the OPML-only access key: it is wired into the OPML scope only and deliberately not
+  into the per-source `:feed` scope, because podcast clients fetch enclosure and artwork URLs
+  independently of the feed and cannot carry a query-param token. Feed/stream/image routes are
+  gated by `maybe_basic_auth/2` instead. See the router for the two scopes.
 
   The comparison is done in constant time via `Plug.Crypto.secure_compare/2` so that response
   timing does not reveal how many leading bytes of the token matched.

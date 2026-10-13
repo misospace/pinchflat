@@ -116,6 +116,39 @@
 
 ---
 
+## Public Feed Authorization Model
+
+Public podcast endpoints are gated by two independent controls, and the split is intentional.
+`route_token` is the **OPML-only** access key — it is not a global "unauthenticated endpoints"
+key. `expose_feed_endpoints` (env var `EXPOSE_FEED_ENDPOINTS`) is the separate switch for the
+per-source endpoints.
+
+| Endpoint                         | `route_token`   | Basic auth         | Anonymous when                |
+| -------------------------------- | --------------- | ------------------ | ----------------------------- |
+| `GET /sources/opml`              | Always required | `maybe_basic_auth` | Never — token is mandatory    |
+| `GET /sources/:uuid/feed`        | Not used        | `maybe_basic_auth` | `expose_feed_endpoints` is on |
+| `GET /sources/:uuid/feed_image`  | Not used        | `maybe_basic_auth` | `expose_feed_endpoints` is on |
+| `GET /media/:uuid/episode_image` | Not used        | `maybe_basic_auth` | `expose_feed_endpoints` is on |
+| `GET /media/:uuid/stream`        | Not used        | `maybe_basic_auth` | `expose_feed_endpoints` is on |
+
+`maybe_basic_auth/2` (`lib/pinchflat_web/plugs.ex`) is a no-op when `expose_feed_endpoints` is
+true; otherwise it enforces basic auth only when `BASIC_AUTH_USERNAME` and `BASIC_AUTH_PASSWORD`
+are both set. So with no credentials configured and `EXPOSE_FEED_ENDPOINTS` unset, the feed
+endpoints are still anonymous — `route_token` does not change that.
+
+Feed, image, and stream endpoints deliberately do not accept `route_token`: podcast clients
+fetch enclosure and artwork URLs independently of the feed and cannot carry a query-param token,
+so requiring one would break playback. UUIDs are unguessable, but they are capabilities, not
+authorization — treat `EXPOSE_FEED_ENDPOINTS` as the public-exposure switch and keep basic auth
+(or a reverse-proxy boundary) for private hosting.
+
+Note: `config/runtime.exs` enables `expose_feed_endpoints` when `EXPOSE_FEED_ENDPOINTS` is set to
+**any** non-empty value (`String.length(System.get_env("EXPOSE_FEED_ENDPOINTS", "")) > 0`),
+including the literal string `"false"`. Leave the variable unset to keep the endpoints
+basic-auth gated.
+
+---
+
 ## Build & Asset Pipeline
 
 Used in both local dev and CI/CD.
