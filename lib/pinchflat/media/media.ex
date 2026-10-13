@@ -171,7 +171,8 @@ defmodule Pinchflat.Media do
     - `delete_files` (default: false) - also delete the media_item's media files
     - `ignore_file_removal_errors` (default: false) - when `delete_files` is true and a
       file cannot be removed, log a warning and delete the record anyway instead of
-      returning the error
+      returning the error; the `media_deleted` user script does not fire, since it only
+      runs when every file was removed or already gone
 
   Returns `{:ok, %MediaItem{}}`, or `{:error, %Ecto.Changeset{}}` (from `Repo.delete/1`),
   or `{:error, {:file_removal_failed, [{filepath, reason}]}}` when `delete_files` is true
@@ -187,7 +188,7 @@ defmodule Pinchflat.Media do
     Tasks.delete_tasks_for(media_item)
 
     with :ok <- delete_attached_files_if_required(media_item, delete_files, ignore_file_removal_errors) do
-      # Should delete these no matter what
+      # Delete internal metadata and the record even if file removal was skipped/attempted
       delete_internal_metadata_files(media_item)
       Repo.delete(media_item)
     end

@@ -871,6 +871,23 @@ defmodule Pinchflat.MediaTest do
       assert_raise Ecto.NoResultsError, fn -> Media.get_media_item!(media_item.id) end
       assert File.exists?(undeletable)
     end
+
+    test "deletes the record and fires the user script when the file is already gone" do
+      media_item = media_item_with_attachments()
+
+      missing_filepath = Path.join(Path.dirname(media_item.media_filepath), "already-gone.mp4")
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: missing_filepath})
+
+      expect(UserScriptRunnerMock, :run, fn :media_deleted, data ->
+        assert data.id == media_item.id
+
+        {:ok, "", 0}
+      end)
+
+      assert {:ok, %MediaItem{}} = Media.delete_media_item(media_item, delete_files: true)
+
+      assert_raise Ecto.NoResultsError, fn -> Media.get_media_item!(media_item.id) end
+    end
   end
 
   describe "delete_media_files/2" do
@@ -1014,6 +1031,42 @@ defmodule Pinchflat.MediaTest do
 
       assert log =~ "Failed to remove"
       assert log =~ undeletable
+    end
+
+    test "does not fire the user script when a file cannot be removed" do
+      media_item = media_item_with_attachments()
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      expect(UserScriptRunnerMock, :run, 0, fn _event, _data -> {:ok, "", 0} end)
+
+      assert {:error, {:file_removal_failed, _}} = Media.delete_media_files(media_item)
+    end
+
+    test "a retry converges once the blocker is cleared" do
+      media_item = media_item_with_attachments()
+
+      undeletable = Path.join(Path.dirname(media_item.media_filepath), "a-directory")
+      File.mkdir_p!(undeletable)
+      {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
+
+      expect(UserScriptRunnerMock, :run, fn :media_deleted, data ->
+        assert data.id == media_item.id
+
+        {:ok, "", 0}
+      end)
+
+      assert {:error, {:file_removal_failed, _}} = Media.delete_media_files(media_item)
+
+      File.rm_rf!(undeletable)
+
+      assert {:ok, updated_media_item} = Media.delete_media_files(media_item)
+
+      assert updated_media_item.media_filepath == nil
+      assert updated_media_item.thumbnail_filepath == nil
+      assert updated_media_item.subtitle_filepaths == []
     end
   end
 
