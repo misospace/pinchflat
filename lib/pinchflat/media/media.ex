@@ -179,7 +179,10 @@ defmodule Pinchflat.Media do
   and one or more files could not be removed. Associated tasks are deleted before any
   file is touched, so a failed call leaves the record in place with its tasks already
   gone and the deletion has to be retried by the caller (or, for cullable items, by the
-  next retention run), unless `ignore_file_removal_errors` is true.
+  next retention run), unless `ignore_file_removal_errors` is true. Internal metadata
+  files (NFO, thumbnail) are removed together with the record, so on a failed call
+  they also linger until a retry succeeds — they cannot be deleted independently of
+  the record they describe.
   """
   def delete_media_item(%MediaItem{} = media_item, opts \\ []) do
     delete_files = Keyword.get(opts, :delete_files, false)

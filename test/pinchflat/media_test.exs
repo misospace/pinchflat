@@ -1024,8 +1024,15 @@ defmodule Pinchflat.MediaTest do
       File.mkdir_p!(undeletable)
       {:ok, media_item} = Media.update_media_item(media_item, %{media_filepath: undeletable})
 
+      # Bump the logger above the :critical default so capture_log can see
+      # the warning emitted by the failure path. capture_log's `:level` option
+      # does not override the primary Logger.level/0 value.
+      original_level = Logger.level()
+      Logger.configure(level: :warning)
+      on_exit(fn -> Logger.configure(level: original_level) end)
+
       log =
-        ExUnit.CaptureLog.capture_log([level: :warning], fn ->
+        ExUnit.CaptureLog.capture_log(fn ->
           assert {:error, {:file_removal_failed, _}} = Media.delete_media_files(media_item)
         end)
 
