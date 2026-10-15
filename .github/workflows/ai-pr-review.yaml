@@ -32,7 +32,7 @@ jobs:
 
       - name: Generate bot token
         id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.BOT_CLIENT_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -40,7 +40,7 @@ jobs:
       - name: Review PR
         if: github.event_name == 'pull_request'
         id: review
-        uses: misospace/pr-reviewer-action@c86f3e94191c9078e92714b10f39deb8d3466268 # v3.2.0
+        uses: misospace/pr-reviewer-action@593f1b7b41bb05aa18d1f9278205e7204b1505ab # v3.5.0
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           ai-base-url: ${{ vars.LITELLM_URL }}
