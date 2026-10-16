@@ -133,6 +133,108 @@ defmodule Pinchflat.FastIndexing.YoutubeApiTest do
 
       assert {:error, "error"} = YoutubeApi.get_recent_media_ids(source)
     end
+
+    test "keeps working after the key list is shortened by a settings change", %{source: source} do
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+
+      # The first request leaves the round-robin agent holding an index of 1, which is
+      # out of bounds for a single key
+      Settings.set(youtube_api_key: "key1")
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+    end
+
+    test "uses the remaining key on every request after the key list is shortened", %{source: source} do
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+
+      Settings.set(youtube_api_key: "key1")
+
+      expect(HTTPClientMock, :get, 3, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+    end
+
+    test "stays in bounds after the key list is reduced from three keys to one", %{source: source} do
+      Settings.set(youtube_api_key: "key1, key2, key3")
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key2"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+
+      # Two requests leave the round-robin agent holding an index of 2, which is
+      # out of bounds for a single key
+      Settings.set(youtube_api_key: "key1")
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+    end
+
+    test "resumes rotating after the key list is reduced to more than one key", %{source: source} do
+      Settings.set(youtube_api_key: "key1, key2, key3")
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      # Two requests leave the round-robin agent holding an index of 2, which is out of
+      # bounds for the two remaining keys
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key2"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+
+      Settings.set(youtube_api_key: "key1, key2")
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key2"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+    end
   end
 
   describe "test_api_key/1" do
