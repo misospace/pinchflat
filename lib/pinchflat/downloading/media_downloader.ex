@@ -84,7 +84,8 @@ defmodule Pinchflat.Downloading.MediaDownloader do
 
         {:error, :unsuitable_for_download} ->
           message =
-            "Media item ##{media_with_preloads.id} isn't suitable for download yet. May be an active or processing live stream"
+            "Media item ##{media_with_preloads.id} isn't suitable for download yet. " <>
+              "May be an active or processing live stream"
 
           Logger.warning(message)
 

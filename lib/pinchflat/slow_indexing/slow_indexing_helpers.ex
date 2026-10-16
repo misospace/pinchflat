@@ -171,6 +171,11 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   end
 
   defp run_indexing_command(source, url, command_opts, should_use_cookies) do
+    # Linked deliberately: if the watcher's per-line handler crashes, the
+    # indexing job should fail (and be retried) too. The tradeoff is that an
+    # asynchronous link-kill skips the `after` below, leaking this run's two
+    # tmpfiles. Acceptable, since surfacing indexing corruption outranks
+    # tmpfile tidiness.
     {:ok, pid} = FileFollowerServer.start_link()
     output_filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
 
@@ -198,7 +203,10 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
           err
       end
     after
-      FileFollowerServer.stop(pid)
+      # Wait for the follower to finish and close its file descriptor before
+      # unlinking: `stop/1` only queues an async cast, so the deletion could
+      # otherwise race the follower's shutdown (or even its file open).
+      FileFollowerServer.stop_and_wait(pid)
       FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
     end
   end
@@ -311,7 +319,8 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
       |> Enum.map_join("\n", fn media_item -> "youtube #{media_item.media_id}" end)
 
     case File.write(tmpfile, archive_contents) do
-      :ok -> {:ok, tmpfile}
+      :ok ->
+        {:ok, tmpfile}
 
       {:error, err} ->
         FilesystemUtils.cleanup_metadata_tmpfile(tmpfile)

@@ -75,7 +75,9 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   `generate_metadata_tmpfile/1`. It is not for paths owned by other processes
   and it never bulk-purges the tmpfile directory: `File.rmdir/1` only
   succeeds on empty directories, so sibling files from other jobs are never
-  touched.
+  touched. (A sibling's namespace directory could in theory be removed in
+  the microseconds between its creation and its file being written; the
+  generator's `write_p!` surfaces that as an error and Oban retries.)
 
   Returns :ok
   """

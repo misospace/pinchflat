@@ -107,4 +107,49 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
       assert is_nil(Process.info(pid))
     end
   end
+
+  describe "stop_and_wait" do
+    test "returns only once the watcher has fully shut down", %{pid: pid, tmpfile: tmpfile} do
+      handler = fn _line -> :noop end
+      FileFollowerServer.watch_file(pid, tmpfile, handler)
+
+      refute is_nil(Process.info(pid))
+      assert :ok = FileFollowerServer.stop_and_wait(pid)
+
+      # The monitor-based wait means the process is gone by the time the caller
+      # gets back control, so its file descriptor is closed and a subsequent
+      # unlink can never race the follower.
+      assert Process.info(pid) == nil
+    end
+
+    test "returns immediately when the watcher is already dead", %{pid: pid} do
+      # Unlink first: killing a linked process would take the test process down with it
+      Process.unlink(pid)
+      ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
+
+      started_at = System.monotonic_time(:millisecond)
+      assert :ok = FileFollowerServer.stop_and_wait(pid)
+      assert System.monotonic_time(:millisecond) - started_at < 1_000
+    end
+
+    test "returns :ok without hanging when the watcher refuses to stop", %{tmpfile: tmpfile} do
+      {:ok, pid} = FileFollowerServer.start_link()
+      on_exit(fn -> Process.exit(pid, :kill) end)
+
+      File.write!(tmpfile, "line1\n")
+
+      # A slow handler keeps the server busy, so it cannot acknowledge the
+      # stop request before the timeout elapses.
+      FileFollowerServer.watch_file(pid, tmpfile, fn _line -> :timer.sleep(300) end)
+      :timer.sleep(20)
+
+      started_at = System.monotonic_time(:millisecond)
+      assert :ok = FileFollowerServer.stop_and_wait(pid, 50)
+      assert System.monotonic_time(:millisecond) - started_at < 250
+
+      File.rm(tmpfile)
+    end
+  end
 end

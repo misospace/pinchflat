@@ -150,6 +150,43 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
 
       assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
     end
+
+    test "survives a null byte in the path without touching the tmpfile root" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      # Deliberately non-namespace-shaped so nothing the cleanup does can collide with it
+      survivor_dir = Path.join([tmpfile_directory, "sibs", "deeper"])
+      survivor = Path.join(survivor_dir, "survivor.json")
+      File.mkdir_p!(survivor_dir)
+      File.write!(survivor, "keep me")
+      poisoned = Path.join([tmpfile_directory, "aa", "bb", "bad\0name.json"])
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(poisoned)
+
+      # Nothing was created or destroyed: only the bogus path was attempted
+      refute File.exists?(Path.join([tmpfile_directory, "aa"]))
+      assert File.read!(survivor) == "keep me"
+      assert File.dir?(tmpfile_directory)
+
+      File.rm_rf!(survivor_dir)
+    end
+
+    test "removes a symlink itself, never its target" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      target = Path.join(tmpfile_directory, "link_target.json")
+      File.write!(target, "important")
+
+      link_dir = Path.join([tmpfile_directory, "cc", "dd"])
+      File.mkdir_p!(link_dir)
+      link = Path.join(link_dir, "alias.json")
+      File.ln_s!(target, link)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(link)
+
+      refute File.exists?(link)
+      assert File.read!(target) == "important"
+
+      File.rm!(target)
+    end
   end
 
   describe "compute_and_save_media_filesize/1" do

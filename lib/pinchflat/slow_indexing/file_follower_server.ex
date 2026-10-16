@@ -39,6 +39,40 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServer do
     GenServer.cast(process, :stop)
   end
 
+  @doc """
+  Stops the file watcher and waits until the server process has actually shut down.
+
+  The stop request rides the server's mailbox (same FIFO as `watch_file/3`), so
+  by the time this returns every cast queued before it has been handled and the
+  followed file's descriptor is closed. Callers that delete the followed file
+  MUST use this instead of `stop/1` — a bare cast returns immediately and the
+  unlink could race the follower's shutdown, or even its file open.
+
+  Returns :ok without waiting when the server is already dead (its descriptor
+  died with it), and :ok after `timeout` with a warning if the server refuses
+  to stop (for example, a handler wedged on one line).
+
+  Returns :ok
+  """
+  def stop_and_wait(process, timeout \\ 5_000) do
+    if Process.alive?(process) do
+      ref = Process.monitor(process)
+      GenServer.cast(process, :stop)
+
+      receive do
+        {:DOWN, ^ref, :process, ^process, _reason} -> :ok
+      after
+        timeout ->
+          Logger.warning("File follower did not shut down within #{timeout}ms; proceeding without it")
+          Process.demonitor(ref, [:flush])
+
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
   # Server Callbacks
   @impl true
   def init(_opts) do
