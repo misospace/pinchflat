@@ -68,6 +68,20 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
       assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
     end
 
+    test "leaves no generated tmpfiles behind when command-option assembly raises" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      # `to_string/1` has no String.Chars implementation for tuples, so parsing
+      # this option raises - and it must raise with the generated file already
+      # covered by the cleanup try, not outside it.
+      assert_raise Protocol.UndefinedError, fn ->
+        Runner.run(@media_url, :foo, [{:limit_rate, {:not, :stringifiable}}], "%(id)s")
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
     test "does not delete a caller-supplied output_filepath" do
       tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
       caller_file = Path.join([tmpfile_directory, "caller_owned.json"])

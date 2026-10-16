@@ -37,17 +37,23 @@ defmodule Pinchflat.YtDlp.CommandRunner do
   def run(url, action_name, command_opts, output_template, addl_opts \\ []) do
     Logger.debug("Running yt-dlp command for action: #{action_name}")
 
-    {output_filepath, owns_output_file} = output_filepath_for(addl_opts)
-    print_to_file_opts = [{:print_to_file, output_template}, output_filepath]
+    # Every option is prepared BEFORE the owned tmpfile exists, and everything
+    # that uses the file lives inside the `try` below. So the only code that runs
+    # between the file's creation and its cleanup guarantee is entering the `try`
+    # itself: no exception path can strand a generated file anymore.
     user_configured_opts = cookie_file_options(addl_opts) ++ rate_limit_options(addl_opts) ++ misc_options()
-    # These must stay in exactly this order, hence why I'm giving it its own variable.
-    all_opts = command_opts ++ print_to_file_opts ++ user_configured_opts ++ global_options()
-    formatted_command_opts = [url] ++ CliUtils.parse_options(all_opts)
     expected_exit_codes = [101] ++ Keyword.get(addl_opts, :expected_exit_codes, [])
 
     wrap_cmd_opts = [expected_exit_codes: expected_exit_codes]
 
+    {output_filepath, owns_output_file} = output_filepath_for(addl_opts)
+
     try do
+      print_to_file_opts = [{:print_to_file, output_template}, output_filepath]
+      # These must stay in exactly this order, hence why I'm giving it its own variable.
+      all_opts = command_opts ++ print_to_file_opts ++ user_configured_opts ++ global_options()
+      formatted_command_opts = [url] ++ CliUtils.parse_options(all_opts)
+
       case CliUtils.wrap_cmd(backend_executable(), formatted_command_opts, [stderr_to_stdout: true], wrap_cmd_opts) do
         # yt-dlp exit codes:
         #   0 = Everything is successful
