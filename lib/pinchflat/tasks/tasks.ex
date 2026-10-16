@@ -90,13 +90,32 @@ defmodule Pinchflat.Tasks do
   Creates a job from given attrs, creating a task with an attached record
   if successful. Returns an error if the job already exists.
 
+  Both records are written in a single transaction, so a failed linkage - either
+  a changeset error or a raised constraint exception - rolls the job insert back
+  alongside it. No caller can observe a committed job with no Task attached. A
+  constraint exception is re-raised to the caller after the rollback.
+
   Returns {:ok, %Task{}} | {:error, :duplicate_job} | {:error, %Ecto.Changeset{}}.
   """
   def create_job_with_task(job_attrs, task_attached_record) do
+    case Repo.transaction(fn -> insert_job_and_task(job_attrs, task_attached_record) end) do
+      {:ok, result} -> result
+      {:error, reason} -> reason
+    end
+  end
+
+  defp insert_job_and_task(job_attrs, attached_record) do
     case Repo.insert_unique_job(job_attrs) do
-      {:ok, job} -> create_task(job, task_attached_record)
-      {:duplicate, _} -> {:error, :duplicate_job}
-      err -> err
+      {:ok, job} -> insert_task_or_rollback(job, attached_record)
+      {:duplicate, _} -> Repo.rollback({:error, :duplicate_job})
+      err -> Repo.rollback(err)
+    end
+  end
+
+  defp insert_task_or_rollback(job, attached_record) do
+    case create_task(job, attached_record) do
+      {:ok, %Task{} = task} -> {:ok, task}
+      err -> Repo.rollback(err)
     end
   end
 
