@@ -585,6 +585,59 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpersTest do
     end
   end
 
+  describe "index_and_enqueue_download_for_media_items/2 when cleaning up generated tmpfiles" do
+    test "leaves no json or download archive files behind after indexing a channel" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, 3, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        # The json output file must exist while the run is in flight
+        assert File.exists?(Keyword.get(addl_opts, :output_filepath))
+
+        {:ok, source_attributes_return_fixture()}
+      end)
+
+      SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "leaves no json or download archive files behind when a tab's indexing fails" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, 3, fn url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        if String.ends_with?(url, "/streams") do
+          {:error, "This channel does not have a streams tab", 1}
+        else
+          {:ok, source_attributes_return_fixture()}
+        end
+      end)
+
+      SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "leaves no json or download archive files behind when every tab fails" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, 3, fn _url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        {:error, "Something went wrong", 1}
+      end)
+
+      assert_raise MatchError, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+  end
+
   describe "index_and_enqueue_download_for_media_items/2 when splitting channels into tabs" do
     test "indexes a channel's videos, shorts, and streams tabs separately" do
       source = source_fixture(%{collection_type: :channel})

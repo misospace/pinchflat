@@ -144,9 +144,13 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
 
     results =
       Enum.map(indexing_urls_for(source), fn {url, content_type} ->
-        command_opts = base_command_opts ++ build_download_archive_options(source, was_forced, content_type)
+        {archive_filepath, archive_opts} = download_archive_options(source, was_forced, content_type)
 
-        run_indexing_command(source, url, command_opts, should_use_cookies)
+        try do
+          run_indexing_command(source, url, base_command_opts ++ archive_opts, should_use_cookies)
+        after
+          if archive_filepath, do: FilesystemUtils.cleanup_metadata_tmpfile(archive_filepath)
+        end
       end)
 
     # A channel can legitimately lack a shorts or streams tab (yt-dlp errors out
@@ -168,6 +172,7 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
 
   defp run_indexing_command(source, url, command_opts, should_use_cookies) do
     {:ok, pid} = FileFollowerServer.start_link()
+    output_filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
 
     handler = fn filepath -> setup_file_follower_watcher(pid, filepath, source) end
 
@@ -175,22 +180,26 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
     # of error — failures are logged here instead, where we can tell a channel
     # legitimately missing a shorts/streams tab apart from a real error.
     runner_opts = [
+      output_filepath: output_filepath,
       file_listener_handler: handler,
       use_cookies: should_use_cookies,
       expected_exit_codes: [1]
     ]
 
-    result = MediaCollection.get_media_attributes_for_collection(url, command_opts, runner_opts)
+    try do
+      result = MediaCollection.get_media_attributes_for_collection(url, command_opts, runner_opts)
 
-    FileFollowerServer.stop(pid)
+      case result do
+        {:ok, media_attributes} ->
+          {:ok, media_attributes}
 
-    case result do
-      {:ok, media_attributes} ->
-        {:ok, media_attributes}
-
-      err ->
-        log_indexing_failure(url, err)
-        err
+        err ->
+          log_indexing_failure(url, err)
+          err
+      end
+    after
+      FileFollowerServer.stop(pid)
+      FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
     end
   end
 
@@ -303,7 +312,13 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
 
     case File.write(tmpfile, archive_contents) do
       :ok -> {:ok, tmpfile}
-      err -> err
+
+      {:error, err} ->
+        FilesystemUtils.cleanup_metadata_tmpfile(tmpfile)
+
+        Logger.warning("Unable to write download archive file for source ##{source.id}: #{inspect(err)}")
+
+        :error
     end
   end
 
@@ -336,21 +351,19 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   # and we don't want to use it if the indexing was forced by the user. In other words,
   # only create an archive for channels that are being indexed as part of their regular
   # indexing schedule. The first indexing pass should also not create an archive.
-  defp build_download_archive_options(%Source{collection_type: :playlist}, _was_forced, _content_type), do: []
-  defp build_download_archive_options(%Source{last_indexed_at: nil}, _was_forced, _content_type), do: []
-  defp build_download_archive_options(_source, true, _content_type), do: []
+  defp download_archive_options(%Source{collection_type: :playlist}, _was_forced, _content_type), do: {nil, []}
+  defp download_archive_options(%Source{last_indexed_at: nil}, _was_forced, _content_type), do: {nil, []}
+  defp download_archive_options(_source, true, _content_type), do: {nil, []}
 
   # The archive is an optimization, so if the file can't be written we index
   # without one rather than passing a bad option to yt-dlp or failing the run.
-  defp build_download_archive_options(source, _was_forced, content_type) do
+  defp download_archive_options(source, _was_forced, content_type) do
     case create_download_archive_file(source, content_type) do
       {:ok, archive_file} ->
-        [:break_on_existing, download_archive: archive_file]
+        {archive_file, [:break_on_existing, download_archive: archive_file]}
 
-      {:error, err} ->
-        Logger.warning("Unable to write download archive file for source ##{source.id}: #{inspect(err)}")
-
-        []
+      :error ->
+        {nil, []}
     end
   end
 end

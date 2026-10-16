@@ -74,33 +74,38 @@ defmodule Pinchflat.Downloading.MediaDownloader do
   #   logic is handled transparently as far as the caller is concerned
   defp attempt_download_and_update_for_media_item(media_item, override_opts) do
     output_filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
-    media_with_preloads = Repo.preload(media_item, [:metadata, source: :media_profile])
 
-    case download_with_options(media_item.original_url, media_with_preloads, output_filepath, override_opts) do
-      {:ok, parsed_json} ->
-        update_media_item_from_parsed_json(media_with_preloads, parsed_json)
+    try do
+      media_with_preloads = Repo.preload(media_item, [:metadata, source: :media_profile])
 
-      {:error, :unsuitable_for_download} ->
-        message =
-          "Media item ##{media_with_preloads.id} isn't suitable for download yet. May be an active or processing live stream"
+      case download_with_options(media_item.original_url, media_with_preloads, output_filepath, override_opts) do
+        {:ok, parsed_json} ->
+          update_media_item_from_parsed_json(media_with_preloads, parsed_json)
 
-        Logger.warning(message)
+        {:error, :unsuitable_for_download} ->
+          message =
+            "Media item ##{media_with_preloads.id} isn't suitable for download yet. May be an active or processing live stream"
 
-        {:error, :unsuitable_for_download, message}
+          Logger.warning(message)
 
-      {:error, message, _exit_code} ->
-        Logger.error("yt-dlp download error for media item ##{media_with_preloads.id}: #{inspect(message)}")
+          {:error, :unsuitable_for_download, message}
 
-        if String.contains?(to_string(message), recoverable_errors()) do
-          attempt_recovery_from_error(media_with_preloads, output_filepath, message)
-        else
-          {:error, :download_failed, message}
-        end
+        {:error, message, _exit_code} ->
+          Logger.error("yt-dlp download error for media item ##{media_with_preloads.id}: #{inspect(message)}")
 
-      err ->
-        Logger.error("Unknown error downloading media item ##{media_with_preloads.id}: #{inspect(err)}")
+          if String.contains?(to_string(message), recoverable_errors()) do
+            attempt_recovery_from_error(media_with_preloads, output_filepath, message)
+          else
+            {:error, :download_failed, message}
+          end
 
-        {:error, :unknown, "Unknown error: #{inspect(err)}"}
+        err ->
+          Logger.error("Unknown error downloading media item ##{media_with_preloads.id}: #{inspect(err)}")
+
+          {:error, :unknown, "Unknown error: #{inspect(err)}"}
+      end
+    after
+      FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
     end
   end
 

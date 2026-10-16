@@ -68,6 +68,36 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   end
 
   @doc """
+  Removes a metadata tmpfile and the empty namespace directories that
+  `generate_metadata_tmpfile/1` created for it.
+
+  Only point this at tmpfiles THIS process generated via
+  `generate_metadata_tmpfile/1`. It is not for paths owned by other processes
+  and it never bulk-purges the tmpfile directory: `File.rmdir/1` only
+  succeeds on empty directories, so sibling files from other jobs are never
+  touched.
+
+  Returns :ok
+  """
+  def cleanup_metadata_tmpfile(filepath) do
+    File.rm(filepath)
+
+    if namespaced_tmpfile_path?(filepath) do
+      parent = Path.dirname(filepath)
+      File.rmdir(parent)
+      File.rmdir(Path.dirname(parent))
+    end
+
+    :ok
+  end
+
+  defp namespaced_tmpfile_path?(filepath) do
+    tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+
+    Path.dirname(Path.relative_to(filepath, tmpfile_directory)) =~ ~r{^[^/]{2}/[^/]{2}$}
+  end
+
+  @doc """
   Writes content to a file, creating directories as needed.
   Takes the same args as File.write/3.
 

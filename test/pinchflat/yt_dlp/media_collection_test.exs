@@ -4,6 +4,7 @@ defmodule Pinchflat.YtDlp.MediaCollectionTest do
   import Pinchflat.SourcesFixtures
 
   alias Pinchflat.YtDlp.Media
+  alias Pinchflat.Utils.FilesystemUtils
   alias Pinchflat.YtDlp.MediaCollection
 
   @channel_url "https://www.youtube.com/c/PinchflatTestChannel"
@@ -75,6 +76,77 @@ defmodule Pinchflat.YtDlp.MediaCollectionTest do
 
       assert_receive {:handler, filename}
       assert String.ends_with?(filename, ".json")
+    end
+
+    test "deletes the generated tmpfile after the run" do
+      test_pid = self()
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        filepath = Keyword.get(addl_opts, :output_filepath)
+        send(test_pid, {:tmpfile, filepath, File.exists?(filepath)})
+
+        {:ok, ""}
+      end)
+
+      assert {:ok, _} = MediaCollection.get_media_attributes_for_collection(@channel_url)
+
+      assert_receive {:tmpfile, filepath, true}
+      refute File.exists?(filepath)
+      refute File.dir?(Path.dirname(filepath))
+    end
+
+    test "deletes the generated tmpfile when the run fails" do
+      test_pid = self()
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        filepath = Keyword.get(addl_opts, :output_filepath)
+        send(test_pid, {:tmpfile, filepath, File.exists?(filepath)})
+
+        {:error, "Big issue", 1}
+      end)
+
+      assert {:error, "Big issue", 1} = MediaCollection.get_media_attributes_for_collection(@channel_url)
+
+      assert_receive {:tmpfile, filepath, true}
+      refute File.exists?(filepath)
+    end
+
+    test "leaves the tmpfile in place when a file_listener_handler is installed" do
+      test_pid = self()
+
+      handler = fn filepath -> send(test_pid, {:listener_filepath, filepath}) end
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        {:ok, ""}
+      end)
+
+      assert {:ok, _} =
+               MediaCollection.get_media_attributes_for_collection(@channel_url, [], file_listener_handler: handler)
+
+      assert_receive {:listener_filepath, filepath}
+      # Ownership transferred to the listener installer, so this method must not remove it
+      assert File.exists?(filepath)
+
+      FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+    end
+
+    test "does not delete a caller-supplied output_filepath" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      caller_file = Path.join([tmpfile_directory, "caller_owned.json"])
+      FilesystemUtils.write_p!(caller_file, "")
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        assert Keyword.get(addl_opts, :output_filepath) == caller_file
+
+        {:ok, ""}
+      end)
+
+      assert {:ok, _} =
+               MediaCollection.get_media_attributes_for_collection(@channel_url, [], output_filepath: caller_file)
+
+      assert File.exists?(caller_file)
+
+      File.rm!(caller_file)
     end
 
     test "gracefully handles partially failed responses" do

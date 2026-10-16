@@ -88,6 +88,70 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
     end
   end
 
+  describe "cleanup_metadata_tmpfile/1" do
+    test "removes the file and its empty namespace directories" do
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+      parent = Path.dirname(filepath)
+      grandparent = Path.dirname(parent)
+
+      assert File.exists?(filepath)
+      assert File.dir?(parent)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      refute File.exists?(filepath)
+      refute File.dir?(parent)
+      refute File.dir?(grandparent)
+    end
+
+    test "never removes the tmpfile_directory itself" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      assert File.dir?(tmpfile_directory)
+    end
+
+    test "removes the file but leaves a non-empty namespace directory in place" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      shared_dir = Path.join([tmpfile_directory, "aa", "bb"])
+      File.mkdir_p!(shared_dir)
+
+      victim = Path.join(shared_dir, "victim.json")
+      sibling = Path.join(shared_dir, "sibling.json")
+      File.write!(victim, "")
+      File.write!(sibling, "")
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(victim)
+
+      refute File.exists?(victim)
+      # The shared parent still holds the sibling, so it must not be removed
+      assert File.exists?(sibling)
+      assert File.dir?(shared_dir)
+
+      File.rm_rf!(Path.dirname(shared_dir))
+    end
+
+    test "only removes the file when the parent is not a namespace directory" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = Path.join(tmpfile_directory, "direct.json")
+      File.write!(filepath, "")
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      refute File.exists?(filepath)
+      assert File.dir?(tmpfile_directory)
+    end
+
+    test "is idempotent when the file is already gone" do
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+      File.rm!(filepath)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+    end
+  end
+
   describe "compute_and_save_media_filesize/1" do
     test "updates the media item with the file size" do
       media_item = media_item_with_attachments()

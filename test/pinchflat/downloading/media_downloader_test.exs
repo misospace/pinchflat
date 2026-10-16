@@ -516,4 +516,75 @@ defmodule Pinchflat.Downloading.MediaDownloaderTest do
       assert updated_media_item.nfo_filepath == nil
     end
   end
+
+  describe "download_for_media_item/3 when cleaning up the generated tmpfile" do
+    test "deletes the tmpfile after a successful download", %{media_item: media_item} do
+      test_pid = self()
+
+      expect(YtDlpRunnerMock, :run, 3, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl ->
+          {:ok, "{}"}
+
+        _url, :download, _opts, _ot, addl ->
+          filepath = Keyword.get(addl, :output_filepath)
+          send(test_pid, {:tmpfile, filepath, File.exists?(filepath)})
+
+          {:ok, render_metadata(:media_metadata)}
+
+        _url, :download_thumbnail, _opts, _ot, _addl ->
+          {:ok, ""}
+      end)
+
+      assert {:ok, _} = MediaDownloader.download_for_media_item(media_item)
+
+      assert_receive {:tmpfile, filepath, true}
+      refute File.exists?(filepath)
+      refute File.dir?(Path.dirname(filepath))
+    end
+
+    test "deletes the tmpfile when the download fails", %{media_item: media_item} do
+      test_pid = self()
+
+      expect(YtDlpRunnerMock, :run, 2, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl ->
+          {:ok, "{}"}
+
+        _url, :download, _opts, _ot, addl ->
+          filepath = Keyword.get(addl, :output_filepath)
+          send(test_pid, {:tmpfile, filepath, File.exists?(filepath)})
+
+          {:error, :some_error, 1}
+      end)
+
+      assert {:error, :download_failed, :some_error} = MediaDownloader.download_for_media_item(media_item)
+
+      assert_receive {:tmpfile, filepath, true}
+      refute File.exists?(filepath)
+    end
+
+    test "deletes the tmpfile after a recovered download", %{media_item: media_item} do
+      message = "Unable to communicate with SponsorBlock"
+      test_pid = self()
+
+      expect(YtDlpRunnerMock, :run, 3, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl ->
+          {:ok, "{}"}
+
+        _url, :download, _opts, _ot, addl ->
+          filepath = Keyword.get(addl, :output_filepath)
+          send(test_pid, {:tmpfile, filepath, File.exists?(filepath)})
+          File.write(filepath, render_metadata(:media_metadata))
+
+          {:error, message, 1}
+
+        _url, :download_thumbnail, _opts, _ot, _addl ->
+          {:ok, ""}
+      end)
+
+      assert {:recovered, _media_item, ^message} = MediaDownloader.download_for_media_item(media_item)
+
+      assert_receive {:tmpfile, filepath, true}
+      refute File.exists?(filepath)
+    end
+  end
 end

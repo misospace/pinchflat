@@ -20,8 +20,9 @@ defmodule Pinchflat.YtDlp.CommandRunner do
 
   Additional Opts:
     - :output_filepath - the path to save the output to. If not provided, a temporary
-      file will be created and used. Useful for if you need a reference to the file
-      for a file watcher.
+      file is created, used, and removed after its contents are read. If provided, the
+      file is considered caller-owned and is never removed by this runner. Useful for
+      if you need a reference to the file for a file watcher.
     - :use_cookies - if true, will add a cookie file to the command options. Will not
       attach a cookie file if the user hasn't set one up.
     - :skip_sleep_interval - if true, will not add the sleep interval options to the command.
@@ -36,7 +37,7 @@ defmodule Pinchflat.YtDlp.CommandRunner do
   def run(url, action_name, command_opts, output_template, addl_opts \\ []) do
     Logger.debug("Running yt-dlp command for action: #{action_name}")
 
-    output_filepath = generate_output_filepath(addl_opts)
+    {output_filepath, owns_output_file} = output_filepath_for(addl_opts)
     print_to_file_opts = [{:print_to_file, output_template}, output_filepath]
     user_configured_opts = cookie_file_options(addl_opts) ++ rate_limit_options(addl_opts) ++ misc_options()
     # These must stay in exactly this order, hence why I'm giving it its own variable.
@@ -46,21 +47,22 @@ defmodule Pinchflat.YtDlp.CommandRunner do
 
     wrap_cmd_opts = [expected_exit_codes: expected_exit_codes]
 
-    case CliUtils.wrap_cmd(backend_executable(), formatted_command_opts, [stderr_to_stdout: true], wrap_cmd_opts) do
-      # yt-dlp exit codes:
-      #   0 = Everything is successful
-      #   100 = yt-dlp must restart for update to complete
-      #   101 = Download cancelled by --max-downloads etc
-      #     2 = Error in user-provided options
-      #     1 = Any other error
-      {_, status} when status in [0, 101] ->
-        # IDEA: consider deleting the file after reading it. It's in the tmp dir, so it's not
-        # a huge deal, but it's still a good idea to clean up after ourselves.
-        # (even on error? especially on error?)
-        File.read(output_filepath)
+    try do
+      case CliUtils.wrap_cmd(backend_executable(), formatted_command_opts, [stderr_to_stdout: true], wrap_cmd_opts) do
+        # yt-dlp exit codes:
+        #   0 = Everything is successful
+        #   100 = yt-dlp must restart for update to complete
+        #   101 = Download cancelled by --max-downloads etc
+        #     2 = Error in user-provided options
+        #     1 = Any other error
+        {_, status} when status in [0, 101] ->
+          File.read(output_filepath)
 
-      {output, status} ->
-        {:error, output, status}
+        {output, status} ->
+          {:error, output, status}
+      end
+    after
+      if owns_output_file, do: FSUtils.cleanup_metadata_tmpfile(output_filepath)
     end
   end
 
@@ -119,10 +121,10 @@ defmodule Pinchflat.YtDlp.CommandRunner do
   defp build_update_args("nightly@" <> version), do: ["--update-to", "nightly@#{version}"]
   defp build_update_args(version), do: ["--update-to", "yt-dlp/yt-dlp@#{version}"]
 
-  defp generate_output_filepath(addl_opts) do
+  defp output_filepath_for(addl_opts) do
     case Keyword.get(addl_opts, :output_filepath) do
-      nil -> FSUtils.generate_metadata_tmpfile(:json)
-      path -> path
+      nil -> {FSUtils.generate_metadata_tmpfile(:json), true}
+      path -> {path, false}
     end
   end
 
