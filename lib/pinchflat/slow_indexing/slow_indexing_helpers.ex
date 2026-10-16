@@ -207,7 +207,7 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
           err
       end
     after
-      stop_follower_and_remove_output(pid, output_filepath)
+      stop_follower_and_remove_output(pid, follower_ref, output_filepath)
     end
   end
 
@@ -233,8 +233,15 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   # follower that won't stop gracefully and reports `{:error, _}` if even that doesn't
   # land, in which case the file stays put: one leaked tmpfile is better than removing
   # a file out from under a live follower.
-  defp stop_follower_and_remove_output(pid, output_filepath) do
-    case FileFollowerServer.stop_and_wait(pid) do
+  defp stop_follower_and_remove_output(pid, follower_ref, output_filepath) do
+    stop_result = FileFollowerServer.stop_and_wait(pid)
+
+    # The crash check above has already run (or the follower stopped cleanly),
+    # so this run's DOWN carries no more information. Drop it instead of letting
+    # it sit in the job's mailbox across tabs.
+    Process.demonitor(follower_ref, [:flush])
+
+    case stop_result do
       :ok ->
         FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
 
