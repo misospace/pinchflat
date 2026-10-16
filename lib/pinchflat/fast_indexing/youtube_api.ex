@@ -127,15 +127,19 @@ defmodule Pinchflat.FastIndexing.YoutubeApi do
 
       keys ->
         pid = get_or_start_api_key_agent()
+        key_count = length(keys)
 
+        # A settings change can shorten the key list while the agent still holds an index
+        # from the longer list, so normalize it into the current list's bounds before use.
         current_index =
           Agent.get_and_update(pid, fn current ->
-            {current, rem(current + 1, length(keys))}
+            normalized = rem(current, key_count)
+            {normalized, rem(normalized + 1, key_count)}
           end)
 
         # Only log the key's position - the raw key must stay out of the logs
         # since they're written to disk and downloadable from the settings UI
-        Logger.debug("Using YouTube API key ##{current_index + 1} of #{length(keys)}")
+        Logger.debug("Using YouTube API key ##{current_index + 1} of #{key_count}")
         Enum.at(keys, current_index)
     end
   end
