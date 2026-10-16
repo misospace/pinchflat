@@ -137,6 +137,16 @@ defmodule Pinchflat.TasksTest do
 
       assert {:error, %Ecto.Changeset{}} = Tasks.create_job_with_task(%Ecto.Changeset{}, source)
     end
+
+    test "rolls back the enqueued job when the task linkage fails" do
+      source = source_fixture()
+      Repo.delete!(source)
+
+      assert %Ecto.ConstraintError{} = catch_error(Tasks.create_job_with_task(TestJobWorker.new(%{}), source))
+
+      refute_enqueued(worker: TestJobWorker)
+      assert Tasks.list_tasks() == []
+    end
   end
 
   describe "delete_task/1" do
