@@ -54,11 +54,14 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServer do
 
   - already dead: `:ok` at once (its descriptor died with it)
   - graceful stop within `:timeout`: `:ok`
-  - still alive after `:timeout`: the process is killed (untrappable, so its descriptor
-    closes with it) and given `:kill_grace_ms` to die; `:ok` if it does
-  - alive even after that (wedged in a system call the VM can't interrupt):
-    `{:error, :follower_unresponsive}`, so the caller leaves the file in place rather
-    than unlinking a descriptor that is still open
+  - still alive after `:timeout`: the process is killed and given `:kill_grace_ms` to
+    die. `exit/2` with `:kill` is untrappable and is delivered even to a suspended
+    process, so this succeeds for anything the VM can schedule; the descriptor closes
+    with the process
+  - alive even after that — a process wedged in a system call the VM cannot interrupt
+    at all: `{:error, :follower_unresponsive}`, so the caller leaves the file in place
+    rather than unlinking a descriptor that is still open. This is a last-resort guard
+    rather than a reachable outcome, so it has no test of its own
 
   Options:
   - `:timeout`: how long to wait for the graceful stop before killing (default 5000)

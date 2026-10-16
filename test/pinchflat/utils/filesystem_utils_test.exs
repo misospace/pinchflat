@@ -89,6 +89,28 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
   end
 
   describe "cleanup_metadata_tmpfile/1" do
+    setup do
+      # These tests assert on the namespace directories themselves, which only works if
+      # nothing else is living in them. The shared tmpfile root accumulates files from
+      # every other test in the suite, and a leftover file is enough to legitimately
+      # stop `File.rmdir/1` — which made "removes the file and its empty namespace
+      # directories" fail whenever another test happened to land in the same namespace.
+      # DataCase tests are synchronous, so swapping the root for the duration of the
+      # block is safe.
+      original = Application.get_env(:pinchflat, :tmpfile_directory)
+      isolated = Path.join(original, "cleanup-metadata-scratch")
+      File.rm_rf!(isolated)
+      File.mkdir_p!(isolated)
+      Application.put_env(:pinchflat, :tmpfile_directory, isolated)
+
+      on_exit(fn ->
+        Application.put_env(:pinchflat, :tmpfile_directory, original)
+        File.rm_rf!(isolated)
+      end)
+
+      :ok
+    end
+
     test "removes the file and its empty namespace directories" do
       filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
       parent = Path.dirname(filepath)

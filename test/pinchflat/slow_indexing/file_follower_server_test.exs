@@ -146,10 +146,12 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
       # and the sleep sits far above the bound asserted below: a graceful stop would have
       # to wait it out, so this test can't pass without exercising the kill path.
       parent = self()
+
       handler = fn _line ->
         send(parent, :handling)
         :timer.sleep(3_000)
       end
+
       FileFollowerServer.watch_file(pid, tmpfile, handler)
       assert_receive :handling, 1_000
 
@@ -164,27 +166,22 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
       File.rm(tmpfile)
     end
 
-    test "returns an error when the watcher survives the forced kill", %{tmpfile: tmpfile} do
+    test "kills a suspended watcher rather than reporting an error", %{tmpfile: tmpfile} do
       {:ok, pid} = FileFollowerServer.start_link()
 
-      # A suspended process runs no code of its own, so it handles neither the stop
-      # request nor the kill that follows it. Stand-in for a follower wedged in a
-      # system call the VM can't interrupt.
+      # A suspended process runs none of its own code, so it never acknowledges the stop
+      # request — the closest in-VM stand-in for a follower wedged in a long handler.
+      # `exit/2` is delivered to it regardless (suspension blocks scheduling, not signal
+      # delivery), which is why the kill escalation is a guarantee rather than a hope:
+      # the only follower that could report `{:error, :follower_unresponsive}` is one
+      # wedged in a system call the VM cannot interrupt at all.
       :erlang.suspend_process(pid)
 
       File.write!(tmpfile, "line1\n")
       FileFollowerServer.watch_file(pid, tmpfile, fn _line -> :noop end)
 
-      # The caller has to hear about this, or it unlinks a file the follower still holds.
-      assert {:error, :follower_unresponsive} = FileFollowerServer.stop_and_wait(pid, timeout: 50, kill_grace_ms: 50)
-
-      assert Process.info(pid) != nil
-
-      # Resume and reap here, in the process that suspended it, rather than in an
-      # on_exit callback: a suspended process handles no signals, so a failed cleanup
-      # would otherwise leave an unkillable follower behind for the rest of the run.
-      :erlang.resume_process(pid)
-      Process.exit(pid, :kill)
+      assert :ok = FileFollowerServer.stop_and_wait(pid, timeout: 50, kill_grace_ms: 50)
+      assert Process.info(pid) == nil
 
       File.rm(tmpfile)
     end
