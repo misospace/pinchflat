@@ -636,6 +636,22 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpersTest do
 
       assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
     end
+
+    test "leaves no json or download archive files behind when the indexing call raises" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        raise "boom"
+      end)
+
+      assert_raise RuntimeError, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
   end
 
   describe "index_and_enqueue_download_for_media_items/2 when splitting channels into tabs" do

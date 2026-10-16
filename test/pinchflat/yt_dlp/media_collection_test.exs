@@ -111,6 +111,23 @@ defmodule Pinchflat.YtDlp.MediaCollectionTest do
       refute File.exists?(filepath)
     end
 
+    test "deletes the generated tmpfile when the runner raises" do
+      test_pid = self()
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        send(test_pid, {:tmpfile, Keyword.get(addl_opts, :output_filepath)})
+
+        raise "boom"
+      end)
+
+      assert_raise RuntimeError, fn ->
+        MediaCollection.get_media_attributes_for_collection(@channel_url)
+      end
+
+      assert_receive {:tmpfile, filepath}
+      refute File.exists?(filepath)
+    end
+
     test "leaves the tmpfile in place when a file_listener_handler is installed" do
       test_pid = self()
 

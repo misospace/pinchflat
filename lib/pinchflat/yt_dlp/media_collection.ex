@@ -48,11 +48,11 @@ defmodule Pinchflat.YtDlp.MediaCollection do
 
     action = :get_media_attributes_for_collection
 
-    if file_listener_handler do
-      file_listener_handler.(output_filepath)
-    end
-
     try do
+      if file_listener_handler do
+        file_listener_handler.(output_filepath)
+      end
+
       case backend_runner().run(url, action, all_command_opts, output_template, runner_opts) do
         {:ok, output} ->
           parse_indexing_response(output)
