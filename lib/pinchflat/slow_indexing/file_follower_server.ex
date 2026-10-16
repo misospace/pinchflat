@@ -10,6 +10,8 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServer do
 
   @poll_interval_ms Application.compile_env(:pinchflat, :file_watcher_poll_interval)
   @activity_timeout_ms 600_000
+  @default_stop_timeout_ms 5_000
+  @default_kill_grace_ms 5_000
 
   # Client API
   @doc """
@@ -43,33 +45,71 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServer do
   Stops the file watcher and waits until the server process has actually shut down.
 
   The stop request rides the server's mailbox (same FIFO as `watch_file/3`), so
-  by the time this returns every cast queued before it has been handled and the
-  followed file's descriptor is closed. Callers that delete the followed file
-  MUST use this instead of `stop/1` — a bare cast returns immediately and the
-  unlink could race the follower's shutdown, or even its file open.
+  every cast queued before it is handled before the process exits. Callers that
+  delete the followed file MUST use this instead of `stop/1` — a bare cast returns
+  immediately and the unlink could race the follower's shutdown, or even its file open.
 
-  Returns :ok without waiting when the server is already dead (its descriptor
-  died with it), and :ok after `timeout` with a warning if the server refuses
-  to stop (for example, a handler wedged on one line).
+  Returns `:ok` only once the process is known to be down, which is the boundary a
+  caller needs before unlinking the followed file:
 
-  Returns :ok
+  - already dead: `:ok` at once (its descriptor died with it)
+  - graceful stop within `:timeout`: `:ok`
+  - still alive after `:timeout`: the process is killed (untrappable, so its descriptor
+    closes with it) and given `:kill_grace_ms` to die; `:ok` if it does
+  - alive even after that (wedged in a system call the VM can't interrupt):
+    `{:error, :follower_unresponsive}`, so the caller leaves the file in place rather
+    than unlinking a descriptor that is still open
+
+  Options:
+  - `:timeout`: how long to wait for the graceful stop before killing (default 5000)
+  - `:kill_grace_ms`: how long to wait for the kill to land (default 5000)
+
+  Returns :ok | {:error, :follower_unresponsive}
   """
-  def stop_and_wait(process, timeout \\ 5_000) do
+  def stop_and_wait(process, opts \\ []) do
     if Process.alive?(process) do
       ref = Process.monitor(process)
+
       GenServer.cast(process, :stop)
 
-      receive do
-        {:DOWN, ^ref, :process, ^process, _reason} -> :ok
-      after
-        timeout ->
-          Logger.warning("File follower did not shut down within #{timeout}ms; proceeding without it")
-          Process.demonitor(ref, [:flush])
-
-          :ok
-      end
+      await_graceful_shutdown(
+        process,
+        ref,
+        Keyword.get(opts, :timeout, @default_stop_timeout_ms),
+        Keyword.get(opts, :kill_grace_ms, @default_kill_grace_ms)
+      )
     else
       :ok
+    end
+  end
+
+  defp await_graceful_shutdown(process, ref, timeout, kill_grace_ms) do
+    receive do
+      {:DOWN, ^ref, :process, ^process, _reason} -> :ok
+    after
+      timeout ->
+        Logger.warning("File follower did not shut down within #{timeout}ms; killing it")
+
+        # Unlink first: a kill of a linked process takes the caller down with it, and
+        # by this point the caller is past the stage where a follower crash should fail
+        # its job. The kill itself still closes the follower's file descriptor.
+        Process.unlink(process)
+        Process.exit(process, :kill)
+
+        await_kill(process, ref, kill_grace_ms)
+    end
+  end
+
+  defp await_kill(process, ref, kill_grace_ms) do
+    receive do
+      {:DOWN, ^ref, :process, ^process, _reason} -> :ok
+    after
+      kill_grace_ms ->
+        Process.demonitor(ref, [:flush])
+
+        Logger.error("File follower survived a forced kill after #{kill_grace_ms}ms; it still holds its file open")
+
+        {:error, :follower_unresponsive}
     end
   end
 

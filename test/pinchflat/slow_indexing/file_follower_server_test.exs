@@ -134,20 +134,57 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
       assert System.monotonic_time(:millisecond) - started_at < 1_000
     end
 
-    test "returns :ok without hanging when the watcher refuses to stop", %{tmpfile: tmpfile} do
+    test "kills a watcher that refuses to stop and returns once it is dead", %{tmpfile: tmpfile} do
       {:ok, pid} = FileFollowerServer.start_link()
       on_exit(fn -> Process.exit(pid, :kill) end)
 
       File.write!(tmpfile, "line1\n")
 
-      # A slow handler keeps the server busy, so it cannot acknowledge the
-      # stop request before the timeout elapses.
-      FileFollowerServer.watch_file(pid, tmpfile, fn _line -> :timer.sleep(300) end)
-      :timer.sleep(20)
+      # A long handler keeps the server busy, so it can't acknowledge the stop request
+      # in time and has to be killed instead. Waiting for the handler to actually start
+      # (instead of sleeping a guessed interval) makes the stop reliably lose that race,
+      # and the sleep sits far above the bound asserted below: a graceful stop would have
+      # to wait it out, so this test can't pass without exercising the kill path.
+      parent = self()
+      handler = fn _line ->
+        send(parent, :handling)
+        :timer.sleep(3_000)
+      end
+      FileFollowerServer.watch_file(pid, tmpfile, handler)
+      assert_receive :handling, 1_000
 
       started_at = System.monotonic_time(:millisecond)
-      assert :ok = FileFollowerServer.stop_and_wait(pid, 50)
-      assert System.monotonic_time(:millisecond) - started_at < 250
+      assert :ok = FileFollowerServer.stop_and_wait(pid, timeout: 50)
+      assert System.monotonic_time(:millisecond) - started_at < 1_000
+
+      # A forced kill still satisfies the caller's contract: the process is gone, so
+      # its descriptor is closed and an unlink can't race it.
+      assert Process.info(pid) == nil
+
+      File.rm(tmpfile)
+    end
+
+    test "returns an error when the watcher survives the forced kill", %{tmpfile: tmpfile} do
+      {:ok, pid} = FileFollowerServer.start_link()
+
+      # A suspended process runs no code of its own, so it handles neither the stop
+      # request nor the kill that follows it. Stand-in for a follower wedged in a
+      # system call the VM can't interrupt.
+      :erlang.suspend_process(pid)
+
+      File.write!(tmpfile, "line1\n")
+      FileFollowerServer.watch_file(pid, tmpfile, fn _line -> :noop end)
+
+      # The caller has to hear about this, or it unlinks a file the follower still holds.
+      assert {:error, :follower_unresponsive} = FileFollowerServer.stop_and_wait(pid, timeout: 50, kill_grace_ms: 50)
+
+      assert Process.info(pid) != nil
+
+      # Resume and reap here, in the process that suspended it, rather than in an
+      # on_exit callback: a suspended process handles no signals, so a failed cleanup
+      # would otherwise leave an unkillable follower behind for the rest of the run.
+      :erlang.resume_process(pid)
+      Process.exit(pid, :kill)
 
       File.rm(tmpfile)
     end

@@ -203,11 +203,22 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
           err
       end
     after
-      # Wait for the follower to finish and close its file descriptor before
-      # unlinking: `stop/1` only queues an async cast, so the deletion could
-      # otherwise race the follower's shutdown (or even its file open).
-      FileFollowerServer.stop_and_wait(pid)
-      FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
+      stop_follower_and_remove_output(pid, output_filepath)
+    end
+  end
+
+  # The output file can only be unlinked once the follower is confirmed down, because
+  # its open descriptor is exactly what we're removing. `stop_and_wait/2` kills a
+  # follower that won't stop gracefully and reports `{:error, _}` if even that doesn't
+  # land, in which case the file stays put: one leaked tmpfile is better than removing
+  # a file out from under a live follower.
+  defp stop_follower_and_remove_output(pid, output_filepath) do
+    case FileFollowerServer.stop_and_wait(pid) do
+      :ok ->
+        FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
+
+      {:error, reason} ->
+        Logger.warning("Leaving indexing tmpfile and its namespace dirs at #{output_filepath} (#{inspect(reason)})")
     end
   end
 
