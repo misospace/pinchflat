@@ -61,7 +61,7 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
       tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
       before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
 
-      wrap_executable("/bin/false", fn ->
+      wrap_executable("#{File.cwd!()}/test/support/scripts/yt-dlp-mocks/1_exit_code.sh", fn ->
         assert {:error, "", 1} = Runner.run(@media_url, :foo, [], "%(id)s")
       end)
 
