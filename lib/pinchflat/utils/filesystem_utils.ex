@@ -96,7 +96,7 @@ defmodule Pinchflat.Utils.FilesystemUtils do
       tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
       namespace = Path.dirname(Path.relative_to(filepath, tmpfile_directory))
 
-      namespace =~ ~r{^[^/]{2}/[^/]{2}$}
+      namespace =~ ~r"^[^/]{2}/[^/]{2}$"
     else
       false
     end
