@@ -35,10 +35,23 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
   end
 
   setup do
-    {:ok, pid} = FileFollowerServer.start_link()
+    {:ok, pid, _ref} = FileFollowerServer.start_monitored()
     tmpfile = FilesystemUtils.generate_metadata_tmpfile(:txt)
 
     {:ok, %{pid: pid, tmpfile: tmpfile}}
+  end
+
+  describe "start_monitored" do
+    test "a crashing watcher reports through the monitor instead of killing the caller" do
+      {:ok, pid, ref} = FileFollowerServer.start_monitored()
+
+      # A start_link'd server would take this process down here and the
+      # assert below would never run - the caller must survive the crash.
+      Process.exit(pid, :kill)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, :kill}
+      assert Process.alive?(self())
+    end
   end
 
   describe "watch_file" do
@@ -123,8 +136,6 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
     end
 
     test "returns immediately when the watcher is already dead", %{pid: pid} do
-      # Unlink first: killing a linked process would take the test process down with it
-      Process.unlink(pid)
       ref = Process.monitor(pid)
       Process.exit(pid, :kill)
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
@@ -135,7 +146,7 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
     end
 
     test "kills a watcher that refuses to stop and returns once it is dead", %{tmpfile: tmpfile} do
-      {:ok, pid} = FileFollowerServer.start_link()
+      {:ok, pid, _ref} = FileFollowerServer.start_monitored()
       on_exit(fn -> Process.exit(pid, :kill) end)
 
       File.write!(tmpfile, "line1\n")
@@ -167,7 +178,7 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
     end
 
     test "kills a suspended watcher rather than reporting an error", %{tmpfile: tmpfile} do
-      {:ok, pid} = FileFollowerServer.start_link()
+      {:ok, pid, _ref} = FileFollowerServer.start_monitored()
 
       # A suspended process runs none of its own code, so it never acknowledges the stop
       # request — the closest in-VM stand-in for a follower wedged in a long handler.

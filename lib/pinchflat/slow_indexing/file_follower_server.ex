@@ -15,12 +15,26 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServer do
 
   # Client API
   @doc """
-  Starts the file follower server
+  Starts the file follower server with a monitor on it instead of a link to
+  the caller.
 
-  Returns {:ok, pid} or {:error, reason}
+  Returns {:ok, pid, monitor_ref}
+
+  Deliberately does not leave the server linked to the caller: a caller that
+  deletes the followed file cannot have the follower kill it asynchronously
+  partway through cleanup. Callers that must fail their job when the watcher's
+  handler crashes (eg: slow indexing) should run their cleanup first, then
+  inspect the returned monitor for an abnormal
+  `{:DOWN, ref, :process, pid, reason}` message and re-raise it themselves.
   """
-  def start_link() do
-    GenServer.start_link(__MODULE__, [])
+  def start_monitored() do
+    {:ok, pid} = GenServer.start_link(__MODULE__, [])
+
+    # No cast or message can have reached the server yet and init/1 cannot
+    # fail, so unlinking now closes the async-kill window for good rather than
+    # just shrinking it. The monitor replaces the link as the death channel.
+    Process.unlink(pid)
+    {:ok, pid, Process.monitor(pid)}
   end
 
   @doc """

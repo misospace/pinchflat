@@ -652,6 +652,30 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpersTest do
 
       assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
     end
+
+    test "fails the job and leaves no tmpfiles behind when the file watcher crashes mid-run" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        # Deleting the source makes the watcher's per-line handler raise on
+        # `Repo.reload!` the moment it reads a line, killing the watcher. The
+        # sleep spans several 50ms test poll intervals, so the crash (and its
+        # monitor DOWN) has landed by the time the command returns.
+        Repo.delete!(source)
+        File.write!(Keyword.fetch!(addl_opts, :output_filepath), source_attributes_return_fixture())
+        :timer.sleep(750)
+
+        {:ok, source_attributes_return_fixture()}
+      end)
+
+      assert_raise RuntimeError, ~r/file follower crashed during indexing/, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
   end
 
   describe "index_and_enqueue_download_for_media_items/2 when splitting channels into tabs" do

@@ -104,7 +104,7 @@ A full yt-dlp metadata fetch of the entire source. Expensive but thorough. Runs 
 
 **Execution flow:**
 
-1. **File follower setup** — starts `FileFollowerServer`, a GenServer that polls the yt-dlp output file every second. As yt-dlp writes JSON lines, the follower immediately parses each one, upserts a `MediaItem`, and kicks off a download job. This means downloads can begin before the full index completes.
+1. **File follower setup** — starts `FileFollowerServer`, a GenServer that polls the yt-dlp output file every second. As yt-dlp writes JSON lines, the follower immediately parses each one, upserts a `MediaItem`, and kicks off a download job. This means downloads can begin before the full index completes. The watcher is monitored rather than linked: if it crashes while handling a line, the indexing job still fails (and gets retried), but only after its tmpfile cleanup has run — an asynchronous link-kill would skip that cleanup and leak files (issue #141).
 
 2. **Download archive** (channels only, scheduled re-indexing) — queries the most recent 50 media items for the source, skips the 20 newest, and writes the next 30 as a yt-dlp archive file (`youtube {media_id}` one per line). This is passed with `--break-on-existing` so yt-dlp stops when it reaches known media and doesn't re-crawl the full history.
 

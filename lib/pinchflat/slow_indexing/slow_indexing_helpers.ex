@@ -171,12 +171,12 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   end
 
   defp run_indexing_command(source, url, command_opts, should_use_cookies) do
-    # Linked deliberately: if the watcher's per-line handler crashes, the
-    # indexing job should fail (and be retried) too. The tradeoff is that an
-    # asynchronous link-kill skips the `after` below, leaking this run's two
-    # tmpfiles. Acceptable, since surfacing indexing corruption outranks
-    # tmpfile tidiness.
-    {:ok, pid} = FileFollowerServer.start_link()
+    # The watcher is monitored, not linked: a watcher-handler crash must still
+    # fail (and get retried as) the indexing job, but a link would kill this
+    # process asynchronously and skip the `after` here and in the caller,
+    # leaking this run's tmpfiles. So the crash is detected and re-raised below,
+    # after cleanup has had its chance to run.
+    {:ok, pid, follower_ref} = FileFollowerServer.start_monitored()
     output_filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
 
     handler = fn filepath -> setup_file_follower_watcher(pid, filepath, source) end
@@ -194,6 +194,10 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
     try do
       result = MediaCollection.get_media_attributes_for_collection(url, command_opts, runner_opts)
 
+      # A watcher that crashed while yt-dlp ran must fail the job the way the
+      # old link did - but only after the `after` below has removed the tmpfile.
+      raise_if_follower_crashed(follower_ref)
+
       case result do
         {:ok, media_attributes} ->
           {:ok, media_attributes}
@@ -204,6 +208,23 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
       end
     after
       stop_follower_and_remove_output(pid, output_filepath)
+    end
+  end
+
+  # Consumes this run's monitor DOWN if it has already been delivered and
+  # re-raises an abnormal follower exit. A crash landing during the final read
+  # poll can slip past this check; that is tolerated because the caller still
+  # creates every media item from the full yt-dlp result, so a missed crash
+  # costs progress visibility, not data.
+  defp raise_if_follower_crashed(ref) do
+    receive do
+      {:DOWN, ^ref, :process, _pid, reason} when reason not in [:normal, :shutdown] ->
+        raise "file follower crashed during indexing: #{inspect(reason)}"
+
+      {:DOWN, ^ref, :process, _pid, _reason} ->
+        :ok
+    after
+      0 -> :ok
     end
   end
 
