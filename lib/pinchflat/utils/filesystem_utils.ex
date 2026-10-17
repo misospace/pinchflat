@@ -120,7 +120,8 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   # `File.lstat/1` does not follow symlinks, so a `:directory` type proves the
   # component is a real directory rather than a redirect. A missing directory
   # counts as safe: there is nothing to unlink or traverse then, and cleanup
-  # must stay idempotent for files that are already gone.
+  # must stay idempotent for files that are already gone. Any other stat error
+  # (permissions and friends) refuses - leaking a tmpfile beats mis-deleting.
   defp namespace_free_of_symlinks?(filepath) do
     parent = Path.dirname(filepath)
 

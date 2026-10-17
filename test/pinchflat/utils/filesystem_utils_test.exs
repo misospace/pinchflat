@@ -171,6 +171,10 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
       File.rm!(filepath)
 
       assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      # Second pass: the namespace directories are gone with it, so the guard
+      # must treat the enoent stats as safe rather than refusing.
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
     end
 
     test "survives a null byte in the path without touching the tmpfile root" do
