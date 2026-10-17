@@ -192,6 +192,30 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
       File.rm_rf!(survivor_dir)
     end
 
+    test "refuses to delete through a symlinked namespace directory" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+      namespace_dir = Path.dirname(filepath)
+
+      # Stand-in for a process with write access to the tmpfile root swapping a
+      # namespace directory for a symlink elsewhere: the same-named file at the
+      # symlink target must survive cleanup untouched.
+      escape_target = Path.join(tmpfile_directory, "escape-target")
+      File.mkdir_p!(escape_target)
+      victim = Path.join(escape_target, Path.basename(filepath))
+      File.write!(victim, "keep me")
+
+      File.rm!(filepath)
+      File.rmdir!(namespace_dir)
+      File.ln_s!(escape_target, namespace_dir)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      assert File.read!(victim) == "keep me"
+
+      File.rm_rf!(escape_target)
+    end
+
     test "removes a symlink itself, never its target" do
       tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
       target = Path.join(tmpfile_directory, "link_target.json")

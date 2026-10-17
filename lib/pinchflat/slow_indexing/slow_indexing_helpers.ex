@@ -350,12 +350,15 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   # From there, we format the media IDs in the way that yt-dlp expects (ie: "<extractor> <media_id>")
   # and return the filepath to the caller.
   defp create_download_archive_file(source, content_type) do
-    tmpfile = FilesystemUtils.generate_metadata_tmpfile(:txt)
-
+    # Contents are built BEFORE the tmpfile exists so a raising query can never
+    # strand an archive: the only thing between generation and the caller's
+    # armed cleanup is `File.write/2`, which reports failures as tuples.
     archive_contents =
       source
       |> get_media_items_for_download_archive(content_type)
       |> Enum.map_join("\n", fn media_item -> "youtube #{media_item.media_id}" end)
+
+    tmpfile = FilesystemUtils.generate_metadata_tmpfile(:txt)
 
     case File.write(tmpfile, archive_contents) do
       :ok ->

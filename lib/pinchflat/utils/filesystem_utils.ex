@@ -79,15 +79,28 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   the microseconds between its creation and its file being written; the
   generator's `write_p!` surfaces that as an error and Oban retries.)
 
+  For namespace-shaped paths, cleanup also refuses to run - with a warning -
+  unless both namespace directories are real directories per `File.lstat/1`.
+  `File.rm/1` follows symlinked parent directories, so without this check a
+  process that can write under the tmpfile root could redirect cleanup into
+  another directory and have it delete a same-named file there. That is
+  best-effort containment for a shared root, not a closed race: it removes
+  the systematic exposure, and a swap landing between this check and the
+  unlink would need openat-style unlinking that the stdlib does not expose.
+
   Returns :ok
   """
   def cleanup_metadata_tmpfile(filepath) do
-    File.rm(filepath)
+    if namespaced_tmpfile_path?(filepath) && !namespace_free_of_symlinks?(filepath) do
+      Logger.warning("Refusing to clean metadata tmpfile #{filepath}: a namespace directory is not a real directory")
+    else
+      File.rm(filepath)
 
-    if namespaced_tmpfile_path?(filepath) do
-      parent = Path.dirname(filepath)
-      File.rmdir(parent)
-      File.rmdir(Path.dirname(parent))
+      if namespaced_tmpfile_path?(filepath) do
+        parent = Path.dirname(filepath)
+        File.rmdir(parent)
+        File.rmdir(Path.dirname(parent))
+      end
     end
 
     :ok
@@ -102,6 +115,22 @@ defmodule Pinchflat.Utils.FilesystemUtils do
     else
       false
     end
+  end
+
+  # `File.lstat/1` does not follow symlinks, so a `:directory` type proves the
+  # component is a real directory rather than a redirect. A missing directory
+  # counts as safe: there is nothing to unlink or traverse then, and cleanup
+  # must stay idempotent for files that are already gone.
+  defp namespace_free_of_symlinks?(filepath) do
+    parent = Path.dirname(filepath)
+
+    Enum.all?([parent, Path.dirname(parent)], fn dir ->
+      case File.lstat(dir) do
+        {:ok, %File.Stat{type: :directory}} -> true
+        {:error, :enoent} -> true
+        _other -> false
+      end
+    end)
   end
 
   @doc """

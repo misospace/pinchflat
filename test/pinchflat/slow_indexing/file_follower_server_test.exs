@@ -47,9 +47,10 @@ defmodule Pinchflat.SlowIndexing.FileFollowerServerTest do
 
       # A start_link'd server would take this process down here and the
       # assert below would never run - the caller must survive the crash.
+      # An externally delivered `:kill` arrives in DOWN as `:killed`.
       Process.exit(pid, :kill)
 
-      assert_receive {:DOWN, ^ref, :process, ^pid, :kill}
+      assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
       assert Process.alive?(self())
     end
   end

@@ -676,6 +676,23 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpersTest do
 
       assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
     end
+
+    test "does not create an archive when building the archive contents raises" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      # The archive query is the first media_items access in the indexing flow,
+      # so dropping the table makes exactly the archive-content construction
+      # raise - and it must raise before any archive tmpfile exists.
+      Repo.query!("DROP TABLE media_items")
+
+      assert_raise Exqlite.Error, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
   end
 
   describe "index_and_enqueue_download_for_media_items/2 when splitting channels into tabs" do
