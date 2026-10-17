@@ -134,6 +134,34 @@ defmodule Pinchflat.FastIndexing.YoutubeApiTest do
       assert {:error, "error"} = YoutubeApi.get_recent_media_ids(source)
     end
 
+    test "returns an error without calling the API if no keys are configured", %{source: source} do
+      Settings.set(youtube_api_key: nil)
+
+      assert {:error, _reason} = YoutubeApi.get_recent_media_ids(source)
+    end
+
+    test "returns an error without calling the API if only whitespace keys are configured", %{
+      source: source
+    } do
+      Settings.set(youtube_api_key: "  ,  ")
+
+      assert {:error, _reason} = YoutubeApi.get_recent_media_ids(source)
+    end
+
+    test "adopts the existing key agent if one is already registered", %{source: source} do
+      {:ok, existing_agent} = Agent.start(fn -> 0 end, name: {:global, YoutubeApi.KeyIndex})
+
+      expect(HTTPClientMock, :get, fn url, _headers ->
+        assert url =~ "key=key1"
+        {:ok, "{}"}
+      end)
+
+      assert {:ok, []} = YoutubeApi.get_recent_media_ids(source)
+      # Proves the existing agent was adopted: it advanced from 0 to 1 instead of
+      # a fresh agent being started over it
+      assert Agent.get(existing_agent, & &1) == 1
+    end
+
     test "keeps working after the key list is shortened by a settings change", %{source: source} do
       expect(HTTPClientMock, :get, fn url, _headers ->
         assert url =~ "key=key1"
