@@ -173,6 +173,111 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
     end
   end
 
+  describe "redirects" do
+    test "follows a single 301 redirect with a relative Location and returns the final 200 body" do
+      {port, cleanup} =
+        start_seq_listener!(fn _port ->
+          [
+            redirect_response(301, "Moved Permanently", "/final"),
+            ok_response("redirected")
+          ]
+        end)
+
+      try do
+        assert {:ok, "redirected"} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "follows a single 302 redirect with an absolute Location and returns the final 200 body" do
+      {port, cleanup} =
+        start_seq_listener!(fn port ->
+          [
+            redirect_response(302, "Found", "http://127.0.0.1:#{port}/final"),
+            ok_response("redirected")
+          ]
+        end)
+
+      try do
+        assert {:ok, "redirected"} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "follows a single 307 redirect and returns the final 200 body" do
+      {port, cleanup} =
+        start_seq_listener!(fn port ->
+          [
+            redirect_response(307, "Temporary Redirect", "http://127.0.0.1:#{port}/final"),
+            ok_response("redirected")
+          ]
+        end)
+
+      try do
+        assert {:ok, "redirected"} = HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:error, _} once the redirect hop cap is exceeded, with exactly one request per hop" do
+      Application.put_env(
+        :pinchflat,
+        HTTPClient,
+        Keyword.merge(Application.get_env(:pinchflat, HTTPClient, []), max_redirects: 2)
+      )
+
+      {port, cleanup, request_count} = start_loop_listener!(301, "Moved Permanently")
+
+      try do
+        assert {result, _elapsed_ms} =
+                 run_within(5_000, fn ->
+                   HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+                 end)
+
+        assert {:error, "HTTP request failed: redirect limit of 2 exceeded"} = result
+
+        # The cap counts redirects followed: the initial request plus one
+        # per allowed hop. Every hop's response was fully consumed before
+        # the next request was issued, so no request was left in flight to
+        # leak a socket when the cap tripped.
+        assert request_count.() == 3
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:error, _} for a 301 with no Location header" do
+      {port, cleanup} =
+        start_seq_listener!(fn _port ->
+          ["HTTP/1.1 301 Moved Permanently\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"]
+        end)
+
+      try do
+        assert {:error, "HTTP request failed with status code 301: Moved Permanently"} =
+                 HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+
+    test "returns {:error, _} for a redirect with an unusable Location target" do
+      {port, cleanup} =
+        start_seq_listener!(fn _port ->
+          [redirect_response(302, "Found", "ftp://127.0.0.1/nope")]
+        end)
+
+      try do
+        assert {:error, "HTTP request failed with status code 302: Found"} =
+                 HTTPClient.get("http://127.0.0.1:#{port}/", [], [])
+      after
+        cleanup.()
+      end
+    end
+  end
+
   # --- helpers ---------------------------------------------------------------
 
   # Starts a TCP listener on a free port and returns `{port, cleanup}` where
@@ -297,6 +402,129 @@ defmodule Pinchflat.HTTP.HTTPClientTest do
     {:ok, port} = :inet.port(listen_socket)
     :gen_tcp.close(listen_socket)
     {:ok, port}
+  end
+
+  # Starts a TCP listener on a free port that serves `responses_fn.(port)` —
+  # one raw HTTP response per incoming connection, in order. Extra connections
+  # are accepted and closed without a reply. Returns `{port, cleanup}`.
+  defp start_seq_listener!(responses_fn) do
+    {:ok, listen_socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(listen_socket)
+    responses = responses_fn.(port)
+
+    pid =
+      spawn(fn ->
+        seq_accept_loop(listen_socket, responses)
+      end)
+
+    cleanup = fn ->
+      :gen_tcp.close(listen_socket)
+
+      if Process.alive?(pid) do
+        Process.exit(pid, :kill)
+      end
+    end
+
+    {port, cleanup}
+  end
+
+  defp seq_accept_loop(listen_socket, [response | rest]) do
+    case :gen_tcp.accept(listen_socket) do
+      {:ok, socket} ->
+        :gen_tcp.recv(socket, 0, 5_000)
+        :gen_tcp.send(socket, response)
+        :gen_tcp.close(socket)
+        seq_accept_loop(listen_socket, rest)
+
+      {:error, _reason} ->
+        :ok
+    end
+  end
+
+  defp seq_accept_loop(_listen_socket, []), do: :ok
+
+  # Starts a TCP listener on a free port that replies to every request with
+  # the given redirect status and an absolute `Location` pointing back at
+  # itself — a redirect loop. Counts every request served. Returns
+  # `{port, cleanup, request_count}` where `request_count/0` returns the
+  # number of requests the listener has answered so far.
+  defp start_loop_listener!(status, reason_phrase) do
+    {:ok, listen_socket} =
+      :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+
+    {:ok, port} = :inet.port(listen_socket)
+    counter = spawn(fn -> counter_loop(0) end)
+
+    response =
+      "HTTP/1.1 #{status} #{reason_phrase}\r\n" <>
+        "Location: http://127.0.0.1:#{port}/loop\r\n" <>
+        "Content-Length: 0\r\n" <>
+        "Connection: close\r\n\r\n"
+
+    pid =
+      spawn(fn ->
+        loop_accept_loop(listen_socket, response, counter)
+      end)
+
+    cleanup = fn ->
+      :gen_tcp.close(listen_socket)
+
+      for process <- [pid, counter] do
+        if Process.alive?(process), do: Process.exit(process, :kill)
+      end
+    end
+
+    request_count = fn ->
+      send(counter, {:get, self()})
+
+      receive do
+        {:count, count} -> count
+      after
+        1_000 -> -1
+      end
+    end
+
+    {port, cleanup, request_count}
+  end
+
+  defp loop_accept_loop(listen_socket, response, counter) do
+    case :gen_tcp.accept(listen_socket) do
+      {:ok, socket} ->
+        :gen_tcp.recv(socket, 0, 5_000)
+        send(counter, :incr)
+        :gen_tcp.send(socket, response)
+        :gen_tcp.close(socket)
+        loop_accept_loop(listen_socket, response, counter)
+
+      {:error, _reason} ->
+        :ok
+    end
+  end
+
+  defp counter_loop(count) do
+    receive do
+      :incr ->
+        counter_loop(count + 1)
+
+      {:get, pid} ->
+        send(pid, {:count, count})
+        counter_loop(count)
+    end
+  end
+
+  defp redirect_response(status, reason_phrase, location) do
+    "HTTP/1.1 #{status} #{reason_phrase}\r\n" <>
+      "Location: #{location}\r\n" <>
+      "Content-Length: 0\r\n" <>
+      "Connection: close\r\n\r\n"
+  end
+
+  defp ok_response(body) do
+    "HTTP/1.1 200 OK\r\n" <>
+      "Content-Length: #{byte_size(body)}\r\n" <>
+      "Connection: close\r\n\r\n" <> body
   end
 
   # Runs `fun` and returns `{result, elapsed_ms}`. If `fun` does not return
