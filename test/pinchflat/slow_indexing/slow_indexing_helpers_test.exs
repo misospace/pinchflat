@@ -585,6 +585,116 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpersTest do
     end
   end
 
+  describe "index_and_enqueue_download_for_media_items/2 when cleaning up generated tmpfiles" do
+    test "leaves no json or download archive files behind after indexing a channel" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, 3, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        # The json output file must exist while the run is in flight
+        assert File.exists?(Keyword.get(addl_opts, :output_filepath))
+
+        {:ok, source_attributes_return_fixture()}
+      end)
+
+      SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "leaves no json or download archive files behind when a tab's indexing fails" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, 3, fn url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        if String.ends_with?(url, "/streams") do
+          {:error, "This channel does not have a streams tab", 1}
+        else
+          {:ok, source_attributes_return_fixture()}
+        end
+      end)
+
+      SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "leaves no json or download archive files behind when every tab fails" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, 3, fn _url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        {:error, "Something went wrong", 1}
+      end)
+
+      assert_raise MatchError, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "leaves no json or download archive files behind when the indexing call raises" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, _addl_opts ->
+        raise "boom"
+      end)
+
+      assert_raise RuntimeError, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "fails the job and leaves no tmpfiles behind when the file watcher crashes mid-run" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      expect(YtDlpRunnerMock, :run, fn _url, :get_media_attributes_for_collection, _opts, _ot, addl_opts ->
+        # Deleting the source makes the watcher's per-line handler raise on
+        # `Repo.reload!` the moment it reads a line, killing the watcher. The
+        # sleep spans several 50ms test poll intervals, so the crash (and its
+        # monitor DOWN) has landed by the time the command returns.
+        Repo.delete!(source)
+        File.write!(Keyword.fetch!(addl_opts, :output_filepath), source_attributes_return_fixture())
+        :timer.sleep(750)
+
+        {:ok, source_attributes_return_fixture()}
+      end)
+
+      assert_raise RuntimeError, ~r/file follower crashed during indexing/, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "does not create an archive when building the archive contents raises" do
+      source = source_fixture(%{collection_type: :channel, last_indexed_at: now()})
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      # The archive query is the first media_items access in the indexing flow,
+      # so dropping the table makes exactly the archive-content construction
+      # raise - and it must raise before any archive tmpfile exists.
+      Repo.query!("DROP TABLE media_items")
+
+      assert_raise Exqlite.Error, fn ->
+        SlowIndexingHelpers.index_and_enqueue_download_for_media_items(source)
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+  end
+
   describe "index_and_enqueue_download_for_media_items/2 when splitting channels into tabs" do
     test "indexes a channel's videos, shorts, and streams tabs separately" do
       source = source_fixture(%{collection_type: :channel})

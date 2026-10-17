@@ -144,9 +144,13 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
 
     results =
       Enum.map(indexing_urls_for(source), fn {url, content_type} ->
-        command_opts = base_command_opts ++ build_download_archive_options(source, was_forced, content_type)
+        {archive_filepath, archive_opts} = download_archive_options(source, was_forced, content_type)
 
-        run_indexing_command(source, url, command_opts, should_use_cookies)
+        try do
+          run_indexing_command(source, url, base_command_opts ++ archive_opts, should_use_cookies)
+        after
+          if archive_filepath, do: FilesystemUtils.cleanup_metadata_tmpfile(archive_filepath)
+        end
       end)
 
     # A channel can legitimately lack a shorts or streams tab (yt-dlp errors out
@@ -167,7 +171,13 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   end
 
   defp run_indexing_command(source, url, command_opts, should_use_cookies) do
-    {:ok, pid} = FileFollowerServer.start_link()
+    # The watcher is monitored, not linked: a watcher-handler crash must still
+    # fail (and get retried as) the indexing job, but a link would kill this
+    # process asynchronously and skip the `after` here and in the caller,
+    # leaking this run's tmpfiles. So the crash is detected and re-raised below,
+    # after cleanup has had its chance to run.
+    {:ok, pid, follower_ref} = FileFollowerServer.start_monitored()
+    output_filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
 
     handler = fn filepath -> setup_file_follower_watcher(pid, filepath, source) end
 
@@ -175,22 +185,68 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
     # of error — failures are logged here instead, where we can tell a channel
     # legitimately missing a shorts/streams tab apart from a real error.
     runner_opts = [
+      output_filepath: output_filepath,
       file_listener_handler: handler,
       use_cookies: should_use_cookies,
       expected_exit_codes: [1]
     ]
 
-    result = MediaCollection.get_media_attributes_for_collection(url, command_opts, runner_opts)
+    try do
+      result = MediaCollection.get_media_attributes_for_collection(url, command_opts, runner_opts)
 
-    FileFollowerServer.stop(pid)
+      # A watcher that crashed while yt-dlp ran must fail the job the way the
+      # old link did - but only after the `after` below has removed the tmpfile.
+      raise_if_follower_crashed(follower_ref)
 
-    case result do
-      {:ok, media_attributes} ->
-        {:ok, media_attributes}
+      case result do
+        {:ok, media_attributes} ->
+          {:ok, media_attributes}
 
-      err ->
-        log_indexing_failure(url, err)
-        err
+        err ->
+          log_indexing_failure(url, err)
+          err
+      end
+    after
+      stop_follower_and_remove_output(pid, follower_ref, output_filepath)
+    end
+  end
+
+  # Consumes this run's monitor DOWN if it has already been delivered and
+  # re-raises an abnormal follower exit. A crash landing during the final read
+  # poll can slip past this check; that is tolerated because the caller still
+  # creates every media item from the full yt-dlp result, so a missed crash
+  # costs progress visibility, not data.
+  defp raise_if_follower_crashed(ref) do
+    receive do
+      {:DOWN, ^ref, :process, _pid, reason} when reason not in [:normal, :shutdown] ->
+        raise "file follower crashed during indexing: #{inspect(reason)}"
+
+      {:DOWN, ^ref, :process, _pid, _reason} ->
+        :ok
+    after
+      0 -> :ok
+    end
+  end
+
+  # The output file can only be unlinked once the follower is confirmed down, because
+  # its open descriptor is exactly what we're removing. `stop_and_wait/2` kills a
+  # follower that won't stop gracefully and reports `{:error, _}` if even that doesn't
+  # land, in which case the file stays put: one leaked tmpfile is better than removing
+  # a file out from under a live follower.
+  defp stop_follower_and_remove_output(pid, follower_ref, output_filepath) do
+    stop_result = FileFollowerServer.stop_and_wait(pid)
+
+    # The crash check above has already run (or the follower stopped cleanly),
+    # so this run's DOWN carries no more information. Drop it instead of letting
+    # it sit in the job's mailbox across tabs.
+    Process.demonitor(follower_ref, [:flush])
+
+    case stop_result do
+      :ok ->
+        FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
+
+      {:error, reason} ->
+        Logger.warning("Leaving indexing tmpfile and its namespace dirs at #{output_filepath} (#{inspect(reason)})")
     end
   end
 
@@ -294,16 +350,26 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   # From there, we format the media IDs in the way that yt-dlp expects (ie: "<extractor> <media_id>")
   # and return the filepath to the caller.
   defp create_download_archive_file(source, content_type) do
-    tmpfile = FilesystemUtils.generate_metadata_tmpfile(:txt)
-
+    # Contents are built BEFORE the tmpfile exists so a raising query can never
+    # strand an archive: the only thing between generation and the caller's
+    # armed cleanup is `File.write/2`, which reports failures as tuples.
     archive_contents =
       source
       |> get_media_items_for_download_archive(content_type)
       |> Enum.map_join("\n", fn media_item -> "youtube #{media_item.media_id}" end)
 
+    tmpfile = FilesystemUtils.generate_metadata_tmpfile(:txt)
+
     case File.write(tmpfile, archive_contents) do
-      :ok -> {:ok, tmpfile}
-      err -> err
+      :ok ->
+        {:ok, tmpfile}
+
+      {:error, err} ->
+        FilesystemUtils.cleanup_metadata_tmpfile(tmpfile)
+
+        Logger.warning("Unable to write download archive file for source ##{source.id}: #{inspect(err)}")
+
+        :error
     end
   end
 
@@ -336,21 +402,19 @@ defmodule Pinchflat.SlowIndexing.SlowIndexingHelpers do
   # and we don't want to use it if the indexing was forced by the user. In other words,
   # only create an archive for channels that are being indexed as part of their regular
   # indexing schedule. The first indexing pass should also not create an archive.
-  defp build_download_archive_options(%Source{collection_type: :playlist}, _was_forced, _content_type), do: []
-  defp build_download_archive_options(%Source{last_indexed_at: nil}, _was_forced, _content_type), do: []
-  defp build_download_archive_options(_source, true, _content_type), do: []
+  defp download_archive_options(%Source{collection_type: :playlist}, _was_forced, _content_type), do: {nil, []}
+  defp download_archive_options(%Source{last_indexed_at: nil}, _was_forced, _content_type), do: {nil, []}
+  defp download_archive_options(_source, true, _content_type), do: {nil, []}
 
   # The archive is an optimization, so if the file can't be written we index
   # without one rather than passing a bad option to yt-dlp or failing the run.
-  defp build_download_archive_options(source, _was_forced, content_type) do
+  defp download_archive_options(source, _was_forced, content_type) do
     case create_download_archive_file(source, content_type) do
       {:ok, archive_file} ->
-        [:break_on_existing, download_archive: archive_file]
+        {archive_file, [:break_on_existing, download_archive: archive_file]}
 
-      {:error, err} ->
-        Logger.warning("Unable to write download archive file for source ##{source.id}: #{inspect(err)}")
-
-        []
+      :error ->
+        {nil, []}
     end
   end
 end

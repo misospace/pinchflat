@@ -47,6 +47,53 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
 
       assert String.contains?(output, "--print-to-file %(id)s /tmp/yt-dlp-output.json")
     end
+
+    test "deletes the generated tmpfile and its empty directories after a successful run" do
+      assert {:ok, output} = Runner.run(@media_url, :foo, [], "%(id)s")
+
+      [_, tmpfile_path] = Regex.run(~r{--print-to-file \S+ (\S+\.json)}, output)
+
+      refute File.exists?(tmpfile_path)
+      refute File.dir?(Path.dirname(tmpfile_path))
+    end
+
+    test "leaves no generated tmpfiles behind when the command fails" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      wrap_executable("#{File.cwd!()}/test/support/scripts/yt-dlp-mocks/1_exit_code.sh", fn ->
+        assert {:error, "", 1} = Runner.run(@media_url, :foo, [], "%(id)s")
+      end)
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "leaves no generated tmpfiles behind when command-option assembly raises" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      before = Path.wildcard(Path.join([tmpfile_directory, "**"]))
+
+      # `to_string/1` has no String.Chars implementation for tuples, so parsing
+      # this option raises - and it must raise with the generated file already
+      # covered by the cleanup try, not outside it.
+      assert_raise Protocol.UndefinedError, fn ->
+        Runner.run(@media_url, :foo, [{:limit_rate, {:not, :stringifiable}}], "%(id)s")
+      end
+
+      assert before == Path.wildcard(Path.join([tmpfile_directory, "**"]))
+    end
+
+    test "does not delete a caller-supplied output_filepath" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      caller_file = Path.join([tmpfile_directory, "caller_owned.json"])
+      FilesystemUtils.write_p!(caller_file, "")
+
+      assert {:ok, output} = Runner.run(@media_url, :foo, [], "%(id)s", output_filepath: caller_file)
+      assert String.contains?(output, "--print-to-file %(id)s #{caller_file}")
+
+      assert File.exists?(caller_file)
+
+      File.rm!(caller_file)
+    end
   end
 
   describe "run/4 when testing external file options" do
