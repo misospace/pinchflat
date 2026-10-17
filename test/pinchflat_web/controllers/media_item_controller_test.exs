@@ -402,6 +402,18 @@ defmodule PinchflatWeb.MediaItemControllerTest do
       assert {"content-range", "bytes */#{filesize}"} in conn.resp_headers
     end
 
+    test "returns 416 when range end is before range start", %{conn: conn, media_item: media_item} do
+      filesize = File.stat!(media_item.media_filepath).size
+
+      conn =
+        conn
+        |> put_req_header("range", "bytes=200-100")
+        |> get(~p"/media/#{media_item.uuid}/stream")
+
+      assert conn.status == 416
+      assert {"content-range", "bytes */#{filesize}"} in conn.resp_headers
+    end
+
     test "returns 416 when range start is exactly at EOF", %{conn: conn, media_item: media_item} do
       filesize = File.stat!(media_item.media_filepath).size
 
