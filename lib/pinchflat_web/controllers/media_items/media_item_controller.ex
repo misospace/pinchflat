@@ -169,6 +169,10 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
       {{start_pos, _}, {end_pos, _}} when end_pos >= file_size ->
         {:ok, {start_pos, file_size - 1}}
 
+      # Reversed range (eg: "bytes=200-100") - end position precedes the start position
+      {{start_pos, _}, {end_pos, _}} when end_pos < start_pos ->
+        {:error, :range_not_satisfiable}
+
       {{start_pos, _}, {end_pos, _}} ->
         {:ok, {start_pos, end_pos}}
     end
