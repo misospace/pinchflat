@@ -72,8 +72,10 @@ else
   # Fork runs have empty workflow_run.pull_requests associations, so fall back to
   # the PR search API. The head filter matches owner:branch across ALL of that
   # owner's repos, so the jq select pins the exact head repo. Paginated in case
-  # the owner has more open PRs for the branch than one page.
-  candidates=$(gh api --paginate --slurp "repos/${REPOSITORY}/pulls" \
+  # the owner has more open PRs for the branch than one page. --method GET is
+  # required: adding any -f parameter flips gh's default method to POST, and
+  # POST repos/{owner}/{repo}/pulls is the create-PR endpoint, not a search.
+  candidates=$(gh api --paginate --slurp --method GET "repos/${REPOSITORY}/pulls" \
     -f state=open -f per_page=100 -f "head=${HEAD_OWNER}:${HEAD_BRANCH}" \
     | jq --arg repo "$HEAD_REPO" '[.[][] | select(.head.repo.full_name == $repo)]') \
     || fail "open PR search for head ${HEAD_OWNER}:${HEAD_BRANCH} failed"

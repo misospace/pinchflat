@@ -227,6 +227,13 @@ search_was_pinned() {
     && grep -F -q -- "-f head=${HEAD_OWNER}:${HEAD_BRANCH}" "$log"
 }
 
+# Any -f parameter flips gh's default method to POST, and
+# POST repos/{owner}/{repo}/pulls is the create-PR endpoint, not a search: the
+# fork fallback only works if it asks with GET explicitly.
+search_was_get() {
+  local log=$CASE_DIR/fixtures/calls.log
+  [[ -f "$log" ]] && grep -F -q -- '--method GET repos/' "$log"
+}
 
 fetched_only_pr() {
   local log=$CASE_DIR/fixtures/calls.log
@@ -234,6 +241,16 @@ fetched_only_pr() {
     && ! grep -F -q -- 'pulls/9' "$log"
 }
 
+# expect_accept takes a single predicate and expands it unquoted, so a
+# combination has to be a real command list here: an expanded "a && b" is extra
+# arguments to a, never a control operator.
+search_resolved_the_run_s_pr() {
+  search_was_pinned && search_was_get
+}
+
+search_resolved_the_only_pr() {
+  search_resolved_the_run_s_pr && fetched_only_pr
+}
 
 # expect_accept <desc> <pr> <sha> [predicate]
 expect_accept() {
@@ -311,7 +328,7 @@ write_search "[[$(pr_json 42 open "$HEAD_REPO" "$RUN_HEAD_SHA")],[]]"
 write_pr 42 open "$HEAD_REPO" "$RUN_HEAD_SHA"
 invoke
 expect_accept "empty associations resolve through a head-pinned open PR search" 42 \
-  "$RUN_HEAD_SHA" search_was_pinned
+  "$RUN_HEAD_SHA" search_resolved_the_run_s_pr
 
 new_case
 CASE_ASSOCIATIONS='[]'
@@ -320,7 +337,7 @@ write_search "[[${other_repo_pr}],[$(pr_json 42 open "$HEAD_REPO" "$RUN_HEAD_SHA
 write_pr 42 open "$HEAD_REPO" "$RUN_HEAD_SHA"
 invoke
 expect_accept "same-named branch on another repo of the same owner cannot impersonate" 42 \
-  "$RUN_HEAD_SHA" fetched_only_pr
+  "$RUN_HEAD_SHA" search_resolved_the_only_pr
 
 new_case
 CASE_HEAD_OWNER='$(touch PWNED_owner)'
