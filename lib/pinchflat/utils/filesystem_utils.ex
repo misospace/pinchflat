@@ -68,6 +68,73 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   end
 
   @doc """
+  Removes a metadata tmpfile and the empty namespace directories that
+  `generate_metadata_tmpfile/1` created for it.
+
+  Only point this at tmpfiles THIS process generated via
+  `generate_metadata_tmpfile/1`. It is not for paths owned by other processes
+  and it never bulk-purges the tmpfile directory: `File.rmdir/1` only
+  succeeds on empty directories, so sibling files from other jobs are never
+  touched. (A sibling's namespace directory could in theory be removed in
+  the microseconds between its creation and its file being written; the
+  generator's `write_p!` surfaces that as an error and Oban retries.)
+
+  For namespace-shaped paths, cleanup also refuses to run - with a warning -
+  unless both namespace directories are real directories per `File.lstat/1`.
+  `File.rm/1` follows symlinked parent directories, so without this check a
+  process that can write under the tmpfile root could redirect cleanup into
+  another directory and have it delete a same-named file there. That is
+  best-effort containment for a shared root, not a closed race: it removes
+  the systematic exposure, and a swap landing between this check and the
+  unlink would need openat-style unlinking that the stdlib does not expose.
+
+  Returns :ok
+  """
+  def cleanup_metadata_tmpfile(filepath) do
+    if namespaced_tmpfile_path?(filepath) && !namespace_free_of_symlinks?(filepath) do
+      Logger.warning("Refusing to clean metadata tmpfile #{filepath}: a namespace directory is not a real directory")
+    else
+      File.rm(filepath)
+
+      if namespaced_tmpfile_path?(filepath) do
+        parent = Path.dirname(filepath)
+        File.rmdir(parent)
+        File.rmdir(Path.dirname(parent))
+      end
+    end
+
+    :ok
+  end
+
+  defp namespaced_tmpfile_path?(filepath) do
+    if Path.type(filepath) == :absolute do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      namespace = Path.dirname(Path.relative_to(filepath, tmpfile_directory))
+
+      namespace =~ ~r"^[^/]{2}/[^/]{2}$"
+    else
+      false
+    end
+  end
+
+  # `File.lstat/1` does not follow symlinks, so a `:directory` type proves the
+  # component is a real directory rather than a redirect. A missing directory
+  # counts as safe: there is nothing to unlink or traverse then, and cleanup
+  # must stay idempotent for files that are already gone. Any other stat error
+  # (permissions and friends) refuses - leaking a tmpfile beats mis-deleting.
+  defp namespace_free_of_symlinks?(filepath) do
+    parent = Path.dirname(filepath)
+
+    Enum.all?([parent, Path.dirname(parent)], fn dir ->
+      case File.lstat(dir) do
+        {:ok, %File.Stat{type: :directory}} -> true
+        {:error, :enoent} -> true
+        _other -> false
+      end
+    end)
+  end
+
+  @doc """
   Writes content to a file, creating directories as needed.
   Takes the same args as File.write/3.
 

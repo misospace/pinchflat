@@ -17,6 +17,11 @@ defmodule Pinchflat.YtDlp.MediaCollection do
     - :file_listener_handler - a function that will be called with the path to the
       file that will be written to when yt-dlp is done. This is useful for
       setting up a file watcher to know when the file is ready to be read.
+      Whoever installs the listener is responsible for stopping the follower and
+      for removing the output file — removing it before the follower stops races
+      the watch.
+    - :output_filepath - a caller-owned path to save the output to, used instead of
+      generating a temp file. It is forwarded to the runner and never removed here.
     - :use_cookies - whether or not to use user-provided cookies when fetching the media details
     - :expected_exit_codes - passed through to the runner; non-zero exit codes the
       caller treats as a normal outcome (logged at debug instead of error)
@@ -30,8 +35,12 @@ defmodule Pinchflat.YtDlp.MediaCollection do
     all_command_opts = [:simulate, :skip_download, :ignore_no_formats_error, :no_warnings] ++ command_opts
     use_cookies = Keyword.get(addl_opts, :use_cookies, false)
     output_template = YtDlpMedia.indexing_output_template()
-    output_filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+    caller_supplied_path = Keyword.get(addl_opts, :output_filepath)
+    output_filepath = caller_supplied_path || FilesystemUtils.generate_metadata_tmpfile(:json)
     file_listener_handler = Keyword.get(addl_opts, :file_listener_handler, false)
+    # This method only owns the file when it generated it AND ownership wasn't
+    # transferred to whoever installs a file listener.
+    self_generated_and_unowned = is_nil(caller_supplied_path) and !file_listener_handler
 
     runner_opts =
       [output_filepath: output_filepath, use_cookies: use_cookies] ++
@@ -39,30 +48,40 @@ defmodule Pinchflat.YtDlp.MediaCollection do
 
     action = :get_media_attributes_for_collection
 
-    if file_listener_handler do
-      file_listener_handler.(output_filepath)
+    try do
+      if file_listener_handler do
+        file_listener_handler.(output_filepath)
+      end
+
+      case backend_runner().run(url, action, all_command_opts, output_template, runner_opts) do
+        {:ok, output} ->
+          parse_indexing_response(output)
+
+        err ->
+          err
+      end
+    after
+      if self_generated_and_unowned do
+        FilesystemUtils.cleanup_metadata_tmpfile(output_filepath)
+      end
     end
+  end
 
-    case backend_runner().run(url, action, all_command_opts, output_template, runner_opts) do
-      {:ok, output} ->
-        parsed_lines =
-          output
-          |> String.split("\n", trim: true)
-          |> Enum.map(fn line ->
-            case Phoenix.json_library().decode(line) do
-              {:ok, parsed_json} ->
-                YtDlpMedia.response_to_struct(parsed_json)
+  defp parse_indexing_response(output) do
+    parsed_lines =
+      output
+      |> String.split("\n", trim: true)
+      |> Enum.map(fn line ->
+        case Phoenix.json_library().decode(line) do
+          {:ok, parsed_json} ->
+            YtDlpMedia.response_to_struct(parsed_json)
 
-              _ ->
-                nil
-            end
-          end)
+          _ ->
+            nil
+        end
+      end)
 
-        {:ok, Enum.filter(parsed_lines, &(&1 != nil))}
-
-      err ->
-        err
-    end
+    {:ok, Enum.filter(parsed_lines, &(&1 != nil))}
   end
 
   @doc """

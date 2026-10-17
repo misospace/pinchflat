@@ -88,6 +88,157 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
     end
   end
 
+  describe "cleanup_metadata_tmpfile/1" do
+    setup do
+      # These tests assert on the namespace directories themselves, which only works if
+      # nothing else is living in them. The shared tmpfile root accumulates files from
+      # every other test in the suite, and a leftover file is enough to legitimately
+      # stop `File.rmdir/1` — which made "removes the file and its empty namespace
+      # directories" fail whenever another test happened to land in the same namespace.
+      # DataCase tests are synchronous, so swapping the root for the duration of the
+      # block is safe.
+      original = Application.get_env(:pinchflat, :tmpfile_directory)
+      isolated = Path.join(original, "cleanup-metadata-scratch")
+      File.rm_rf!(isolated)
+      File.mkdir_p!(isolated)
+      Application.put_env(:pinchflat, :tmpfile_directory, isolated)
+
+      on_exit(fn ->
+        Application.put_env(:pinchflat, :tmpfile_directory, original)
+        File.rm_rf!(isolated)
+      end)
+
+      :ok
+    end
+
+    test "removes the file and its empty namespace directories" do
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+      parent = Path.dirname(filepath)
+      grandparent = Path.dirname(parent)
+
+      assert File.exists?(filepath)
+      assert File.dir?(parent)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      refute File.exists?(filepath)
+      refute File.dir?(parent)
+      refute File.dir?(grandparent)
+    end
+
+    test "never removes the tmpfile_directory itself" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      assert File.dir?(tmpfile_directory)
+    end
+
+    test "removes the file but leaves a non-empty namespace directory in place" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      shared_dir = Path.join([tmpfile_directory, "aa", "bb"])
+      File.mkdir_p!(shared_dir)
+
+      victim = Path.join(shared_dir, "victim.json")
+      sibling = Path.join(shared_dir, "sibling.json")
+      File.write!(victim, "")
+      File.write!(sibling, "")
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(victim)
+
+      refute File.exists?(victim)
+      # The shared parent still holds the sibling, so it must not be removed
+      assert File.exists?(sibling)
+      assert File.dir?(shared_dir)
+
+      File.rm_rf!(Path.dirname(shared_dir))
+    end
+
+    test "only removes the file when the parent is not a namespace directory" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = Path.join(tmpfile_directory, "direct.json")
+      File.write!(filepath, "")
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      refute File.exists?(filepath)
+      assert File.dir?(tmpfile_directory)
+    end
+
+    test "is idempotent when the file is already gone" do
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+      File.rm!(filepath)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      # Second pass: the namespace directories are gone with it, so the guard
+      # must treat the enoent stats as safe rather than refusing.
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+    end
+
+    test "survives a null byte in the path without touching the tmpfile root" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      # Deliberately non-namespace-shaped so nothing the cleanup does can collide with it
+      survivor_dir = Path.join([tmpfile_directory, "sibs", "deeper"])
+      survivor = Path.join(survivor_dir, "survivor.json")
+      File.mkdir_p!(survivor_dir)
+      File.write!(survivor, "keep me")
+      poisoned = Path.join([tmpfile_directory, "aa", "bb", "bad\0name.json"])
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(poisoned)
+
+      # Nothing was created or destroyed: only the bogus path was attempted
+      refute File.exists?(Path.join([tmpfile_directory, "aa"]))
+      assert File.read!(survivor) == "keep me"
+      assert File.dir?(tmpfile_directory)
+
+      File.rm_rf!(survivor_dir)
+    end
+
+    test "refuses to delete through a symlinked namespace directory" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      filepath = FilesystemUtils.generate_metadata_tmpfile(:json)
+      namespace_dir = Path.dirname(filepath)
+
+      # Stand-in for a process with write access to the tmpfile root swapping a
+      # namespace directory for a symlink elsewhere: the same-named file at the
+      # symlink target must survive cleanup untouched.
+      escape_target = Path.join(tmpfile_directory, "escape-target")
+      File.mkdir_p!(escape_target)
+      victim = Path.join(escape_target, Path.basename(filepath))
+      File.write!(victim, "keep me")
+
+      File.rm!(filepath)
+      File.rmdir!(namespace_dir)
+      File.ln_s!(escape_target, namespace_dir)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(filepath)
+
+      assert File.read!(victim) == "keep me"
+
+      File.rm_rf!(escape_target)
+    end
+
+    test "removes a symlink itself, never its target" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      target = Path.join(tmpfile_directory, "link_target.json")
+      File.write!(target, "important")
+
+      link_dir = Path.join([tmpfile_directory, "cc", "dd"])
+      File.mkdir_p!(link_dir)
+      link = Path.join(link_dir, "alias.json")
+      File.ln_s!(target, link)
+
+      assert :ok = FilesystemUtils.cleanup_metadata_tmpfile(link)
+
+      refute File.exists?(link)
+      assert File.read!(target) == "important"
+
+      File.rm!(target)
+    end
+  end
+
   describe "compute_and_save_media_filesize/1" do
     test "updates the media item with the file size" do
       media_item = media_item_with_attachments()
