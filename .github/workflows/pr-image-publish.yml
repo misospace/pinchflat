@@ -10,12 +10,13 @@ name: Publish PR Image
 # The pr-image artifact (image.tar + meta/pr + meta/sha) is produced by ci.yml
 # steps that a fork PR can edit, so its metadata is untrusted and must never
 # be interpolated into shell script source. The PR number and full head SHA
-# are resolved from GitHub's own run/PR data instead, and the artifact
-# metadata is validated against them, fail-closed, by the default-branch copy
-# of tooling/pr_image_metadata.sh. The artifact is extracted under $RUNNER_TEMP
-# and the validator runs from a copy staged outside the workspace, so no
-# artifact byte can overwrite or influence the gating code. Validated values
-# reach run blocks only through env vars, with quoted expansions.
+# are resolved from GitHub's own run/PR data instead, fail-closed, by the
+# default-branch copy of tooling/pr_identity_resolver.sh, and the artifact
+# metadata is validated against them by the default-branch copy of
+# tooling/pr_image_metadata.sh (issue #143). The artifact is extracted under
+# $RUNNER_TEMP and both gating scripts run from copies staged outside the
+# workspace, so no artifact byte can overwrite or influence them. Validated
+# values reach run blocks only through env vars, with quoted expansions.
 
 on:
   workflow_run:
@@ -60,9 +61,10 @@ jobs:
             echo "No pr-image artifact for this run; nothing to publish."
           fi
 
-      # Default-branch copy of the validator script. This checkout is of the
-      # base repo at the commit this workflow ran from, never the fork's, so
-      # the validator itself is trusted even though the artifact is not.
+      # Default-branch copies of the two gating scripts. This checkout is of the
+      # base repo at the commit this workflow ran from, never the fork's, so the
+      # resolver and validator themselves are trusted even though the artifact
+      # is not.
       - name: Checkout trusted scripts
         if: steps.check.outputs.exists == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -71,10 +73,11 @@ jobs:
 
       # Resolve the PR number and head SHA from trusted GitHub data only. The
       # PR object's head.sha is the trusted head SHA: an artifact from a
-      # superseded push carries a stale short SHA and fails closed below.
-      # Fork runs have empty workflow_run.pull_requests associations, so fall
-      # back to the PR search API, matching the exact head repo as well as the
-      # branch so a same-named branch on another fork cannot impersonate.
+      # superseded push carries a stale short SHA and fails closed inside the
+      # resolver. The logic now lives in tooling/pr_identity_resolver.sh (issue
+      # #143), whose default-branch copy is staged to $RUNNER_TEMP for the same
+      # reason as the validator below: the artifact is extracted under
+      # $RUNNER_TEMP, so no artifact byte can influence the gating code.
       - name: Resolve trusted PR identity
         id: trusted
         if: steps.check.outputs.exists == 'true'
@@ -88,47 +91,8 @@ jobs:
           RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          fail() {
-            echo "Refusing to publish: $*" >&2
-            exit 1
-          }
-          [[ "$RUN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "run head SHA is not 40 lowercase hex characters"
-          assoc_count=$(jq 'length' <<< "$PR_ASSOCIATIONS")
-          if [ "$assoc_count" -eq 1 ]; then
-            pr=$(jq -r '.[0].number' <<< "$PR_ASSOCIATIONS")
-          elif [ "$assoc_count" -gt 1 ]; then
-            fail "workflow run is associated with $assoc_count pull requests; ambiguous"
-          else
-            # The head filter matches owner:branch across ALL of that owner's
-            # repos, so the jq select pins the exact head repo. Paginated in
-            # case the owner has more open PRs for the branch than one page.
-            candidates=$(gh api --paginate --slurp "repos/${REPOSITORY}/pulls" \
-              -f state=open -f per_page=100 -f "head=${HEAD_OWNER}:${HEAD_BRANCH}" \
-              | jq --arg repo "$HEAD_REPO" '[.[][] | select(.head.repo.full_name == $repo)]')
-            match_count=$(jq 'length' <<< "$candidates")
-            if [ "$match_count" -ne 1 ]; then
-              fail "expected exactly one open PR for head ${HEAD_OWNER}:${HEAD_BRANCH} in ${HEAD_REPO}, found ${match_count}"
-            fi
-            pr=$(jq -r '.[0].number' <<< "$candidates")
-          fi
-          [[ "$pr" =~ ^[0-9]+$ ]] || fail "resolved PR number is not a plain integer"
-          pr_data=$(gh api "repos/${REPOSITORY}/pulls/${pr}")
-          state=$(jq -r '.state' <<< "$pr_data")
-          head_repo=$(jq -r '.head.repo.full_name' <<< "$pr_data")
-          head_sha=$(jq -r '.head.sha' <<< "$pr_data")
-          [ "$state" = "open" ] || fail "PR #${pr} is not open (state: ${state})"
-          [ "$head_repo" = "$HEAD_REPO" ] || fail "PR #${pr} head repo ${head_repo} does not match the run's head repo ${HEAD_REPO}"
-          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || fail "PR #${pr} head SHA is not 40 lowercase hex characters"
-          # The PR must not have advanced past this run; otherwise a stale
-          # artifact could be published and commented as the current head.
-          # (For pull_request runs the run's head_sha is the PR head commit,
-          # verified against this repo's own run data.)
-          [ "$head_sha" = "$RUN_HEAD_SHA" ] || fail "PR #${pr} head ${head_sha} is not the run's head ${RUN_HEAD_SHA}; a newer push supersedes this artifact"
-          {
-            echo "pr=${pr}"
-            echo "sha=${head_sha}"
-          } >> "$GITHUB_OUTPUT"
-          echo "Trusted PR #${pr} at head ${head_sha}"
+          install -Dm755 "$GITHUB_WORKSPACE/tooling/pr_identity_resolver.sh" "$RUNNER_TEMP/pr_identity_resolver.sh"
+          bash "$RUNNER_TEMP/pr_identity_resolver.sh"
 
       - name: Download image artifact
         if: steps.check.outputs.exists == 'true'
