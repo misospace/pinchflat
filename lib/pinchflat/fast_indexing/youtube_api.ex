@@ -71,15 +71,25 @@ defmodule Pinchflat.FastIndexing.YoutubeApi do
   defp do_api_request(playlist_id) do
     Logger.debug("Fetching recent media IDs from YouTube API for playlist: #{playlist_id}")
 
-    playlist_id
-    |> construct_api_endpoint()
-    |> http_client().get(accept: "application/json")
-    |> case do
-      {:ok, response} ->
-        Phoenix.json_library().decode(response)
+    case next_api_key() do
+      {:ok, api_key} ->
+        playlist_id
+        |> construct_api_endpoint(api_key)
+        |> http_client().get(accept: "application/json")
+        |> case do
+          {:ok, response} ->
+            Phoenix.json_library().decode(response)
+
+          {:error, reason} ->
+            Logger.error("Failed to fetch YouTube API: #{inspect(reason)}")
+            {:error, reason}
+        end
 
       {:error, reason} ->
-        Logger.error("Failed to fetch YouTube API: #{inspect(reason)}")
+        # A settings write can clear the key list between the caller's `enabled?`
+        # check and this request. Return the error instead of raising so the caller
+        # can fall back to the RSS feed
+        Logger.warning("No YouTube API key available: #{reason}")
         {:error, reason}
     end
   end
@@ -113,17 +123,23 @@ defmodule Pinchflat.FastIndexing.YoutubeApi do
   defp get_or_start_api_key_agent do
     case Agent.start(fn -> 0 end, name: @agent_name) do
       {:ok, pid} -> pid
+      # `:global` reports a clash as already_started today, but returns
+      # already_registered when the name is registered between the pre-start check
+      # and this process's registration (possible on a multi-node install)
       {:error, {:already_started, pid}} -> pid
+      {:error, {:already_registered, pid}} -> pid
     end
   end
 
-  # Gets the next API key in round-robin fashion
+  # Gets the next API key in round-robin fashion, or an error when no keys are
+  # configured. Returning the error (rather than a nil key) lets the caller fall
+  # back to the RSS feed instead of raising while building the request URL
   defp next_api_key do
     keys = api_keys()
 
     case keys do
       [] ->
-        nil
+        {:error, "no YouTube API key is configured"}
 
       keys ->
         pid = get_or_start_api_key_agent()
@@ -140,16 +156,16 @@ defmodule Pinchflat.FastIndexing.YoutubeApi do
         # Only log the key's position - the raw key must stay out of the logs
         # since they're written to disk and downloadable from the settings UI
         Logger.debug("Using YouTube API key ##{current_index + 1} of #{key_count}")
-        Enum.at(keys, current_index)
+        {:ok, Enum.at(keys, current_index)}
     end
   end
 
-  defp construct_api_endpoint(playlist_id) do
+  defp construct_api_endpoint(playlist_id, api_key) do
     api_base = "https://youtube.googleapis.com/youtube/v3/playlistItems"
     property_type = "contentDetails"
     max_results = 50
 
-    "#{api_base}?part=#{property_type}&maxResults=#{max_results}&playlistId=#{URI.encode_www_form(playlist_id)}&key=#{URI.encode_www_form(next_api_key())}"
+    "#{api_base}?part=#{property_type}&maxResults=#{max_results}&playlistId=#{URI.encode_www_form(playlist_id)}&key=#{URI.encode_www_form(api_key)}"
   end
 
   defp construct_test_endpoint(api_key) do
