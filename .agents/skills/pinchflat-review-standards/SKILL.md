@@ -22,7 +22,11 @@ Every behavior change needs a test. Use the repository's database-aware and web-
 
 ## External-process boundary
 
-External integrations such as yt-dlp, Apprise, HTTP clients, and user scripts must go through the existing behavior interfaces and runtime-selected implementations. Preserve the established argument-array and cancellation wrapper, and do not add a new direct process-launch path or construct command text from user-controlled values. Keep the allowed direct process-launch sites unchanged unless the architecture and tests are deliberately updated.
+External integrations such as yt-dlp, Apprise, HTTP clients, and user scripts must go through the existing behavior interfaces and runtime-selected implementations. Do not add a new direct process-launch path or construct command text from user-controlled values.
+
+- Resolve the yt-dlp runner at runtime through `Application.get_env(:pinchflat, :yt_dlp_runner)`; never use a compile-time module reference (`lib/pinchflat/yt_dlp/media.ex`).
+- Invoke commands through `Pinchflat.Utils.CliUtils.wrap_cmd/4`. It wraps `System.cmd/3` in `priv/cmd_wrapper.sh` so the child process dies when stdin closes (job cancellation). Build argv with `Pinchflat.Utils.CliUtils.parse_options/1`; never build a shell string.
+- Only four modules may call `System.cmd/3` directly: `lib/pinchflat/utils/cli_utils.ex`, `lib/pinchflat/yt_dlp/command_runner.ex`, `lib/pinchflat/lifecycle/notifications/command_runner.ex`, and `lib/pinchflat/lifecycle/user_scripts/command_runner.ex`. Any fifth call site is a review flag.
 
 Review stdout/stderr parsing, exit status, timeout/cancellation, failure reporting, and credential redaction. Add tests around the boundary, not only the happy-path caller.
 
@@ -70,4 +74,3 @@ Review stdout/stderr parsing, exit status, timeout/cancellation, failure reporti
 ### Known stale artifact
 
 The legacy version-bump script and task still emit a date-shaped version; release-please and version.txt are the current versioning path. Flag this only when a PR touches that area, and do not file a drive-by cleanup.
-
