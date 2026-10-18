@@ -82,7 +82,7 @@ Standard Phoenix + LiveView. Routes in `lib/pinchflat_web/router.ex`; controller
 
 ### Configuration injection
 
-Executables and pluggable backends live in application config and are read **at runtime**, never hardcoded — that's what makes `config/test.exs` overrides work. New external tools and swappable backends must follow this pattern. See §6.
+Executables and pluggable backends live in application config and are read **at runtime**, never hardcoded — that's what makes `config/test.exs` overrides work. New external tools and swappable backends must follow this pattern. See the [external-process boundary in the review standards](../pinchflat-review-standards/SKILL.md#external-process-boundary).
 
 ---
 
