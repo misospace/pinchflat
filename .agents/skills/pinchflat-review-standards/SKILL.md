@@ -39,3 +39,35 @@ Review stdout/stderr parsing, exit status, timeout/cancellation, failure reporti
 - Avoid logging secrets or returning sensitive process output to clients.
 - Preserve the deliberate divergence from upstream and its reversibility; do not copy upstream schema or behavior changes without checking the fork's compatibility contract.
 - Report concrete exploit or data-loss paths with the changed location and evidence. Do not turn speculative hardening preferences into blockers.
+
+## Review decisions and known exceptions
+
+### Flag
+
+- Any new compiler warning, formatting failure, static-analysis regression, or behavior change without a test.
+- Debugging leftovers, missing module documentation, newly introduced TODO/FIXME markers, or line lengths that violate the configured limit.
+- A worker that bypasses the established task-linkage/deduplication path or names a queue that is not configured.
+- A new direct process-launch path outside the repository's sanctioned boundary, or command construction that interpolates untrusted values.
+- Tests that assume a fixed checkout directory, run SQLite-backed cases concurrently, or skip the required extension setup.
+- A fork-only schema addition that omits any part of the reversible-upstream inventory, a migration using unsupported database-specific syntax, or a new security-analysis suppression.
+- Regression of the documented indexing behavior, treating the special yt-dlp unavailable-media status as success, or behavior changes without accompanying documentation updates.
+
+### Approve
+
+- Changes localized to the owning context with matching tests.
+- New external integrations that use a behavior interface, runtime configuration, and a test mock.
+- Additive, SQLite-safe migrations that preserve the reversible-fork contract.
+- Tests using the existing fixture factories and metadata helpers.
+- Conventional, user-facing commit subjects and documentation updated alongside behavior.
+
+### Skip
+
+- Dependency-only Renovate bumps limited to lockfiles, the pinned SQLean version, or action SHAs.
+- Release-please PRs that only update generated release metadata and changelog files.
+- The generated ERD image when it is not part of a behavioral change.
+- Documentation-only PRs after checking required formatting.
+
+### Known stale artifact
+
+The legacy version-bump script and task still emit a date-shaped version; release-please and version.txt are the current versioning path. Flag this only when a PR touches that area, and do not file a drive-by cleanup.
+
