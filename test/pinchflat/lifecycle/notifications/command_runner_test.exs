@@ -33,7 +33,7 @@ defmodule Pinchflat.Lifecycle.Notifications.CommandRunnerTest do
     end
 
     test "returns the output when the command fails" do
-      wrap_executable("/bin/false", fn ->
+      wrap_executable("#{File.cwd!()}/test/support/scripts/yt-dlp-mocks/1_exit_code.sh", fn ->
         assert {:error, ""} = Runner.run("server_1", [])
       end)
     end
