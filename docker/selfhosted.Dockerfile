@@ -58,9 +58,19 @@ ARG DENO_VERSION=v2.9.0
 
 # ffmpeg and yt-dlp come from ci-base (ffmpeg is pinned for issue #347). Bumping
 # either binary requires rebuilding ci-base and bumping the consumer pin.
+#
+# yt-dlp is copied into its own directory instead of /usr/local/bin so that the
+# only writable location for self-updates is a directory containing nothing but
+# yt-dlp itself. Its updater resolves the running binary via realpath, then
+# renames `<binary>.new`/`<binary>.old` beside it — so both the binary *and*
+# its parent directory must be writable (yt_dlp/update.py). Making
+# /usr/local/bin writable instead would let any process in the container
+# replace every binary there (Deno, apprise, ...). The symlink below keeps
+# PATH-based lookup (`System.find_executable("yt-dlp")`) working; realpath
+# sends updates back to /opt/yt-dlp.
 COPY --from=builder /usr/bin/ffmpeg /usr/bin/ffmpeg
 COPY --from=builder /usr/bin/ffprobe /usr/bin/ffprobe
-COPY --from=builder /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp
+COPY --from=builder /usr/local/bin/yt-dlp /opt/yt-dlp/yt-dlp
 
 # Apprise is pinned via the shared requirements file so dev/CI and production
 # install the same version (single source of truth with ci-base).
@@ -107,9 +117,16 @@ ENV LC_ALL=en_US.UTF-8
 
 WORKDIR "/app"
 
-# Set up data volumes
+# Set up data volumes and the self-update surface.
+# /opt/yt-dlp (binary + directory) is the only world-writable path outside the
+# data volumes: it exists solely so yt-dlp can self-update in place (its
+# updater requires write access to the binary and its directory). Everything
+# else in /usr/local/bin stays read-only, so the other binaries there (Deno,
+# apprise, ...) cannot be replaced from within the container. The symlink
+# preserves the historical /usr/local/bin/yt-dlp location for PATH lookup.
 RUN mkdir -p /config /downloads /etc/elixir_tzdata_data /etc/yt-dlp/plugins && \
-  chmod ugo+rw /etc/elixir_tzdata_data /etc/yt-dlp /etc/yt-dlp/plugins /usr/local/bin /usr/local/bin/yt-dlp
+  ln -s /opt/yt-dlp/yt-dlp /usr/local/bin/yt-dlp && \
+  chmod ugo+rw /etc/elixir_tzdata_data /etc/yt-dlp /etc/yt-dlp/plugins /opt/yt-dlp /opt/yt-dlp/yt-dlp
 
 # set runner ENV
 ENV MIX_ENV="prod"
