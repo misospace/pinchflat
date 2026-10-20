@@ -61,6 +61,30 @@ yarn run lint:fix      # Prettier auto-fix
 docker build -f docker/selfhosted.Dockerfile -t pinchflat:local .
 ```
 
+### Image Layout Contract
+
+The production image keeps `yt-dlp` in `/opt/yt-dlp/yt-dlp` and exposes
+`/usr/local/bin/yt-dlp` as a symlink to it, so `/usr/local/bin` stays
+non-world-writable while yt-dlp can still self-update in place. That contract
+is covered by a regression suite:
+
+```bash
+bash tooling/test_selfhosted_image.sh                          # layout contract, no Docker needed
+bash tooling/test_selfhosted_image.sh pinchflat:local          # same checks inside the built image (needs Docker)
+```
+
+The first form parses `docker/selfhosted.Dockerfile` and replays its runtime
+command in a simulated root, so it runs anywhere (CI runs it in the `Lint and
+Test` job). The second form runs `tooling/selfhosted_image_checks.sh` inside
+the built image as root and as an unprivileged user, and asserts the final
+permissions, the symlink resolution and a non-downgrading yt-dlp self-update
+(CI runs it in the `Build PR Image` job).
+
+The image-level form needs outbound network access: the `yt-dlp --update`
+probe downloads a release asset. A network failure is reported as a skip, not
+a failure — the suite then asserts nothing about the updater's reachability,
+only about the image's layout and permissions.
+
 ## Utility: List Published GHCR Images
 
 Requires `gh` CLI auth.
