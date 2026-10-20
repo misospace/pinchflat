@@ -570,7 +570,12 @@ PY
   nul_status=$?
   nul_value_error=$(printf '%s\n' "$nul_info" | sed -n 's/^VALUE_ERROR=//p')
   nul_truncated=$(printf '%s\n' "$nul_info" | sed -n 's/^TRUNCATED_ABSENT=//p')
-  if [[ "$nul_status" -eq 0 && "$nul_value_error" == *"embedded null byte"* && "$nul_truncated" == "1" ]]; then
+  # Python's wording for the embedded-NUL ValueError differs across
+  # versions: "embedded null byte" (<= 3.13) and "embedded null character"
+  # (newer CPython, e.g. Debian trixie's python3). Accept either; the
+  # assertion is that the OS layer rejects the path, not the exact wording.
+  if [[ "$nul_status" -eq 0 && ( "$nul_value_error" == *"embedded null byte"* || "$nul_value_error" == *"embedded null character"* ) \
+    && "$nul_truncated" == "1" ]]; then
     report "paths with an embedded NUL byte are rejected by the OS layer instead of being silently truncated" ok
   else
     report "paths with an embedded NUL byte are rejected by the OS layer instead of being silently truncated (value error: ${nul_value_error:-none}, truncated path absent: ${nul_truncated:-none})" bad
