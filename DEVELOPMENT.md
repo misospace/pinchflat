@@ -74,8 +74,10 @@ bash tooling/test_selfhosted_image.sh pinchflat:local          # same checks ins
 ```
 
 The first form parses `docker/selfhosted.Dockerfile` and replays its runtime
-command in a simulated root, so it runs anywhere (CI runs it in the `Lint and
-Test` job). The second form runs `tooling/selfhosted_image_checks.sh` inside
+command in a simulated root. It needs GNU coreutils (`stat -c`, `readlink -f`),
+GNU find, and Bash 4+, so it runs on the Linux CI runner and Linux dev
+environments, not on macOS (CI runs it in the `Lint and Test` job). The second
+form runs `tooling/selfhosted_image_checks.sh` inside
 the built image as root and as an unprivileged user, and asserts the final
 permissions, the symlink resolution and a non-downgrading yt-dlp self-update
 (CI runs it in the `Build PR Image` job).
