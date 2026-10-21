@@ -93,7 +93,8 @@ For `chore` / `refactor` / `test` / `ci` / internal `perf`, keep writing normal 
 1. While iterating, use `tooling/test.sh <path>` for fast feedback.
 2. `yarn run lint:fix` — auto-fix Prettier so the CI prettier check can't fail.
 3. `tooling/lint_test.sh` — reproduces CI's "Lint and Test" job in the same pinned ci-base image. Green here means green in CI. Requires Docker.
-4. If you're on `main`, branch first. **Never push unless explicitly asked.** Prefer amending when the work belongs to the same feature or fix.
+4. `bash tooling/test_selfhosted_image.sh` — asserts the selfhosted image's yt-dlp path/permission contract (Docker-free; CI runs the same suite plus the image-level checks against the built image).
+5. If you're on `main`, branch first. **Never push unless explicitly asked.** Prefer amending when the work belongs to the same feature or fix.
 
 ### Releases
 

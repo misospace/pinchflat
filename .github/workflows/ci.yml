@@ -60,6 +60,14 @@ jobs:
           bash tooling/test_pr_identity_resolver.sh
           bash tooling/test_pr_image_metadata.sh
 
+      # The selfhosted image keeps yt-dlp's self-update surface at
+      # /opt/yt-dlp so /usr/local/bin stays non-world-writable. Assert that
+      # contract here so a Dockerfile regression fails the ordinary PR gate,
+      # not just the image build.
+      - name: Test selfhosted image layout contract
+        run: |
+          bash tooling/test_selfhosted_image.sh
+
       # Cache compiled deps and node_modules keyed on the lockfiles. Unlike the
       # old Docker-layer cache (which rarely hit), this restores the actual
       # deps/_build/node_modules dirs the steps below read from.
@@ -148,6 +156,12 @@ jobs:
           build-args: CI_BASE_IMAGE=${{ env.CI_BASE_IMAGE }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
+
+      # The built image must keep /usr/local/bin non-world-writable while
+      # yt-dlp stays self-updatable through /opt/yt-dlp.
+      - name: Test selfhosted image layout
+        run: |
+          bash tooling/test_selfhosted_image.sh "pinchflat-pr:${{ github.event.pull_request.number }}"
 
       - name: Save image and metadata
         run: |
