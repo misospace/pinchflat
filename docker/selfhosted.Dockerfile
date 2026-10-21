@@ -52,9 +52,15 @@ FROM ${RUNNER_IMAGE}
 ARG TARGETPLATFORM
 ARG PORT=8945
 # Deno is pinned to match ci-base so dev/CI and production run the same version.
-# Keep this in sync with DENO_VERSION in docker/ci-base.Dockerfile.
+# Keep the version and both digests in sync with docker/ci-base.Dockerfile.
 # renovate: datasource=github-releases depName=denoland/deno
 ARG DENO_VERSION=v2.9.0
+# SHA-256 of the Deno release zips fetched below, per Linux architecture — the
+# same digests as in docker/ci-base.Dockerfile, refreshed together with the
+# version from the release's deno-<arch>.zip.sha256sum assets. The build fails
+# loudly on mismatch.
+ARG DENO_SHA256_X86_64=96c9c73fc05ea57603bc28d8071d41e861bd40bcf2a9f849dd5969ed1a2c8498
+ARG DENO_SHA256_AARCH64=a0f266eb189af2f27db0c6dcf9eb2f68ba2e8bbff1442c969ace398463f8b2bf
 
 # ffmpeg and yt-dlp come from ci-base (ffmpeg is pinned for issue #347). Bumping
 # either binary requires rebuilding ci-base and bumping the consumer pin.
@@ -76,8 +82,9 @@ COPY --from=builder /usr/local/bin/yt-dlp /opt/yt-dlp/yt-dlp
 # install the same version (single source of truth with ci-base).
 COPY docker/ci-base.requirements.txt /tmp/ci-base.requirements.txt
 
-RUN apt-get update -y && \
+RUN echo "Building for ${TARGETPLATFORM:?}" && \
     # System packages
+    apt-get update -y && \
     apt-get install -y \
       libstdc++6 \
       openssl \
@@ -97,8 +104,23 @@ RUN apt-get update -y && \
       sqlite3 \
       procps && \
     # Install Deno - required for YouTube downloads (See yt-dlp#14404). Pinned to
-    # match ci-base via DENO_VERSION above.
-    curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- ${DENO_VERSION} -y --no-modify-path && \
+    # match ci-base via DENO_VERSION above, fetched as the versioned GitHub release
+    # zip and verified against the committed SHA-256 above; no remote install
+    # script is piped to a shell. Staged under /tmp so the exec bit is set before
+    # the binary lands in /usr/local/bin (nothing under /usr/local is ever chmod'ed).
+    export DENO_ARCH=$(case ${TARGETPLATFORM:-linux/amd64} in \
+      "linux/arm64")   echo "aarch64" ;; \
+      *)               echo "x86_64"  ;; esac) && \
+    export DENO_SHA256=$(case ${TARGETPLATFORM:-linux/amd64} in \
+      "linux/arm64")   echo "${DENO_SHA256_AARCH64}" ;; \
+      *)               echo "${DENO_SHA256_X86_64}"  ;; esac) && \
+    curl -fsSL "https://github.com/denoland/deno/releases/download/${DENO_VERSION}/deno-${DENO_ARCH}-unknown-linux-gnu.zip" -o /tmp/deno.zip && \
+    { echo "${DENO_SHA256}  /tmp/deno.zip" | sha256sum -c - || \
+      { echo "ERROR: digest mismatch for the Deno zip - if DENO_VERSION was bumped, refresh both DENO_SHA256_* digests in this file (and docker/ci-base.Dockerfile) from the release deno zip's .sha256sum asset" >&2; exit 1; }; } && \
+    unzip -q /tmp/deno.zip -d /tmp/deno-staging && \
+    chmod 755 /tmp/deno-staging/deno && \
+    mv /tmp/deno-staging/deno /usr/local/bin/deno && \
+    rm -rf /tmp/deno.zip /tmp/deno-staging && \
     # Apprise (version pinned in docker/ci-base.requirements.txt, managed by Renovate)
     export PIPX_HOME=/opt/pipx && \
     export PIPX_BIN_DIR=/usr/local/bin && \
