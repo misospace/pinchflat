@@ -67,7 +67,9 @@ config :pinchflat, Oban,
      crontab: [
        {"#{current_minute} #{current_hour} * * *", Pinchflat.YtDlp.UpdateWorker},
        {"0 1 * * *", Pinchflat.Downloading.MediaRetentionWorker},
-       {"0 2 * * *", Pinchflat.Downloading.MediaQualityUpgradeWorker}
+       {"0 2 * * *", Pinchflat.Downloading.MediaQualityUpgradeWorker},
+       # Weekly FTS5 segment merge, after the daily retention worker culls media.
+       {"0 3 * * 0", Pinchflat.Media.SearchIndexOptimizationWorker}
      ]}
   ]
 
