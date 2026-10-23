@@ -30,7 +30,7 @@ defmodule Pinchflat.Media.SearchIndexOptimizationWorkerTest do
     test "returns :ok" do
       media_item_fixture(title: "churned title")
 
-      assert perform_job(SearchIndexOptimizationWorker, %{}) == {:ok, :ok}
+      assert perform_job(SearchIndexOptimizationWorker, %{}) == :ok
     end
   end
 end
