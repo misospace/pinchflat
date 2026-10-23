@@ -26,6 +26,7 @@ All async work goes through **Oban**. A thin `Task` wrapper (`lib/pinchflat/task
 | `MediaRetentionWorker`          | `downloading/`   | Deletes old media per retention settings                |
 | `SourceMetadataStorageWorker`   | `metadata/`      | Fetches/stores source-level metadata, images, NFO       |
 | `FileSyncingWorker`             | `media/`         | Reconciles MediaItem records against files on disk      |
+| `SearchIndexOptimizationWorker` | `media/`         | Weekly FTS5 `optimize` on the media search index        |
 | `SourceDeletionWorker`          | `sources/`       | Cascading Source deletion                               |
 | `MediaProfileDeletionWorker`    | `profiles/`      | Cascading MediaProfile deletion                         |
 | `UpdateWorker`                  | `yt_dlp/`        | Keeps the yt-dlp binary on the configured update policy |
