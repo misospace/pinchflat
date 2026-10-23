@@ -27,7 +27,9 @@
     {:prettier_formatting, "yarn run lint:check", fix: "yarn run lint:fix"},
     {:npm_test, false},
     {:gettext, false},
-    {:ex_unit, env: %{"MIX_ENV" => "test", "EX_CHECK" => "1"}}
+    # --cover enforces the coverage floor configured in mix.exs (fails the run
+    # when total line coverage drops below the pinned threshold).
+    {:ex_unit, "mix test --cover", env: %{"MIX_ENV" => "test", "EX_CHECK" => "1"}}
 
     ## curated tools may be disabled (e.g. the check for compilation warnings)
     # {:compiler, false},
