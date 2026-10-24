@@ -44,6 +44,8 @@ tooling/lint_test.sh                          # full `mix check` — the pre-com
 
 ```bash
 mix check              # full CI suite: formatter + compiler + mix_audit + sobelow + prettier + ex_unit
+# ex_unit runs `mix test --cover` and fails below the coverage threshold pinned
+# in mix.exs (`test_coverage: [summary: [threshold: ...]]`). Lower it deliberately.
 ```
 
 Individual:

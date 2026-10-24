@@ -44,6 +44,8 @@ mix test                                # all tests (alias creates + migrates th
 mix test test/path/to/file_test.exs:42  # single test by line
 
 mix check                               # full quality gate — what CI runs
+                                        # (ex_unit runs `mix test --cover`; CI fails below the
+                                        # coverage threshold pinned in mix.exs `test_coverage`)
 mix credo                               # Elixir style (tooling/.credo.exs)
 mix sobelow --config                    # security scan
 yarn run lint:check                     # Prettier

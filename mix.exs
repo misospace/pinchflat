@@ -18,6 +18,12 @@ defmodule Pinchflat.MixProject do
         credo: :test
       ],
       test_coverage: [
+        # Coverage floor enforced by `mix test --cover`, which `mix check` runs
+        # via tooling/.check.exs. Fails the gate when total line coverage (with
+        # ignore_modules below applied) drops below this number. Measured on CI
+        # at 92.3% when the floor was introduced, so 90 leaves ~2 points of
+        # run-to-run tolerance; lowering it further must be a deliberate edit.
+        summary: [threshold: 90],
         ignore_modules: [
           Pinchflat.HTTP.HTTPClient,
           PinchflatWeb.Layouts,
