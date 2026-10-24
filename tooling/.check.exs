@@ -17,10 +17,10 @@
     {:formatter, env: %{"MIX_ENV" => "test"}},
     # Keep the Mix and Hex advisory databases as separate checks. Cowboy rejects
     # invalid response headers by default, and we do not encode structured header
-    # strings or call cow_cookie:cookie/1. Revisit if any of those paths change.
+    # strings. Revisit if any of those paths change.
     {:hex_audit, "mix hex.audit",
      env: %{
-       "HEX_IGNORE_ADVISORIES" => "GHSA-w4f7-4cxr-rv3c,GHSA-g2wm-735q-3f56"
+       "HEX_IGNORE_ADVISORIES" => "GHSA-w4f7-4cxr-rv3c"
      }},
     {:mix_audit, "mix deps.audit"},
     {:sobelow, "mix sobelow --config"},
