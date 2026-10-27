@@ -84,65 +84,42 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilder do
   end
 
   defp subtitle_options(media_profile) do
-    mapped_struct = Map.from_struct(media_profile)
+    download_subs? = media_profile.download_subs == true
+    embed_subs? = media_profile.embed_subs == true
+    uses_sub_langs? = download_subs? or embed_subs?
 
-    Enum.reduce(mapped_struct, [], fn attr, acc ->
-      case {attr, media_profile} do
-        {{:download_subs, true}, _} ->
-          # Force SRT for now - MAY provide as an option in the future
-          acc ++ [:write_subs, convert_subs: "srt"]
-
-        {{:download_auto_subs, true}, %{download_subs: true}} ->
-          acc ++ [:write_auto_subs]
-
-        {{:download_auto_subs, true}, %{embed_subs: true}} ->
-          acc ++ [:write_auto_subs]
-
-        {{:embed_subs, true}, %{preferred_resolution: pr}} when pr != :audio ->
-          acc ++ [:embed_subs]
-
-        {{:sub_langs, sub_langs}, %{download_subs: true}} ->
-          acc ++ [sub_langs: sub_langs]
-
-        {{:sub_langs, sub_langs}, %{embed_subs: true}} ->
-          acc ++ [sub_langs: sub_langs]
-
-        _ ->
-          acc
-      end
-    end)
+    [
+      # Force SRT for now - MAY provide as an option in the future
+      if(download_subs?, do: [:write_subs, convert_subs: "srt"], else: []),
+      if(embed_subs? and media_profile.preferred_resolution != :audio, do: [:embed_subs], else: []),
+      if(media_profile.download_auto_subs == true and uses_sub_langs?, do: [:write_auto_subs], else: []),
+      if(uses_sub_langs?, do: [sub_langs: media_profile.sub_langs], else: [])
+    ]
+    |> Enum.concat()
   end
 
   defp thumbnail_options(media_item_with_preloads) do
     media_profile = media_item_with_preloads.source.media_profile
-    mapped_struct = Map.from_struct(media_profile)
 
-    Enum.reduce(mapped_struct, [], fn attr, acc ->
-      case attr do
-        {:download_thumbnail, true} ->
-          thumbnail_save_location = determine_thumbnail_location(media_item_with_preloads)
+    [
+      if media_profile.download_thumbnail == true do
+        thumbnail_save_location = determine_thumbnail_location(media_item_with_preloads)
 
-          acc ++ [:write_thumbnail, convert_thumbnail: "jpg", output: "thumbnail:#{thumbnail_save_location}"]
-
-        {:embed_thumbnail, true} ->
-          acc ++ [:embed_thumbnail, convert_thumbnail: "jpg"]
-
-        _ ->
-          acc
-      end
-    end)
+        [:write_thumbnail, convert_thumbnail: "jpg", output: "thumbnail:#{thumbnail_save_location}"]
+      else
+        []
+      end,
+      if(media_profile.embed_thumbnail == true, do: [:embed_thumbnail, convert_thumbnail: "jpg"], else: [])
+    ]
+    |> Enum.concat()
   end
 
   defp metadata_options(media_profile) do
-    mapped_struct = Map.from_struct(media_profile)
-
-    Enum.reduce(mapped_struct, [], fn attr, acc ->
-      case attr do
-        {:download_metadata, true} -> acc ++ [:write_info_json, :clean_info_json]
-        {:embed_metadata, true} -> acc ++ [:embed_metadata]
-        _ -> acc
-      end
-    end)
+    [
+      if(media_profile.download_metadata == true, do: [:write_info_json, :clean_info_json], else: []),
+      if(media_profile.embed_metadata == true, do: [:embed_metadata], else: [])
+    ]
+    |> Enum.concat()
   end
 
   defp quality_options(media_profile) do
