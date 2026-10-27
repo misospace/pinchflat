@@ -31,4 +31,17 @@ defmodule PinchflatWeb.PageControllerTest do
       assert html_response(conn, 200) =~ "MENU"
     end
   end
+
+  describe "GET / when rendering sidebar destinations" do
+    test "links the GitHub nav item and NEW badge to this repository", %{conn: conn} do
+      Settings.set(onboarding: false)
+
+      conn = get(conn, ~p"/")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s(href="https://github.com/misospace/pinchflat")
+      assert html =~ ~s(href="https://github.com/misospace/pinchflat/releases")
+      refute html =~ "CommunityMaintained/pinchflat"
+    end
+  end
 end
