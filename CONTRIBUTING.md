@@ -34,9 +34,10 @@ Open an issue. Check for duplicates first. For bugs, include your Docker version
 ### Development setup
 
 From a clean checkout, the noninteractive setup entry point is the mise
-bootstrap contract: `mise run bootstrap` installs the pinned toolchain (Node,
-yarn, OTP, Elixir — the same releases the CI image ships) plus the pinned
-SQLean extensions, and reports versions and executable paths. Validation runs
+bootstrap contract (`mise` itself is the one prerequisite the contract cannot
+install): `mise run bootstrap` installs the pinned toolchain (Node, yarn, OTP,
+Elixir — the same releases the CI image ships) plus the pinned SQLean
+extensions, and reports versions and executable paths. Validation runs
 through `mise run check` / `mise run test`: they use the Docker wrappers
 (`tooling/lint_test.sh` for the full CI-equivalent `mix check` gate,
 `tooling/test.sh` for the fast iteration loop — Docker plus a one-time

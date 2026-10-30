@@ -26,13 +26,17 @@ min_version = "2026.10.13"
 # review the diff like any dependency bump.
 locked = true
 # Every supported contributor/worker platform gets a checksummed entry so
-# `locked = true` installs work on Linux and macOS, amd64 and arm64.
+# `locked = true` installs work on Linux and macOS, amd64 and arm64. The
+# glibc Linux and macOS targets are covered; musl (Alpine) is not - the
+# OTP build has no musl variant, so a musl host uses the Docker path.
 lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "macos-x64"]
-# Bob's precompiled OTP builds target Ubuntu. Pin the oldest glibc baseline
-# we support so one lock installs on Ubuntu 20.04+ AND other glibc
-# distributions (Debian, ...) - without this, mise compiles OTP from source
-# on any non-Ubuntu glibc host, which is far too slow for a bootstrap and
-# impossible in a rootless sandbox. Keep in sync with OTP_VERSION in
+# Bob's precompiled OTP builds target Ubuntu. Pin one target so a single
+# lock installs on Ubuntu 22.04+ and other glibc distributions of the same
+# era (Debian 12+, ...) - without this, mise compiles OTP from source on
+# any non-Ubuntu glibc host, which is far too slow for a bootstrap and
+# impossible in a rootless sandbox. The build links against the target's
+# glibc (2.34+ for ubuntu-22.04) and its OpenSSL, so a host with an older
+# glibc must use the Docker path instead. Keep in sync with OTP_VERSION in
 # docker/ci-base.Dockerfile.
 erlang = { precompiled_os = "ubuntu-22.04" }
 
@@ -49,10 +53,12 @@ ELIXIR_ERL_OPTIONS = "+fnu"
 # pins the exact version + per-platform checksums in .mise/mise.lock.
 node = "24"
 # Same classic yarn line the ci-base image installs via `npm install -g
-# yarn` (the v1 yarn.lock in this repo is not yarn berry). Its backend
-# locks the exact pinned tarball URL but publishes no checksum; the
-# committed lockfile diff is the review control for it.
-yarn = "1.22.22"
+# yarn` (the v1 yarn.lock in this repo is not yarn berry). The npm backend
+# resolves it from the registry with the registry's integrity hashes
+# instead of an unverified tarball, and `mise lock` records the dependency
+# graph in the committed sidecar .mise/locks/npm-yarn/1.22.22/ - commit
+# that sidecar with the lockfile, it is part of the contract.
+"npm:yarn" = "1.22.22"
 # Keep in sync with OTP_VERSION in docker/ci-base.Dockerfile. mise installs
 # the precompiled OTP release from builds.hex.pm (checksummed in
 # .mise/mise.lock) - the same OTP release the ci-base image ships.

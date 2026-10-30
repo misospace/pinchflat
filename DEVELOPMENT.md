@@ -35,6 +35,10 @@ mise run test        # `mix test` loop — Docker path when a daemon is usable, 
                      # (extra args pass through: mise run test test/path/to/file_test.exs:42)
 ```
 
+`mise` itself is the one prerequisite the contract cannot install — the
+Courier runtime image ships a pinned mise binary; local users install it from
+[mise.jdx.dev](https://mise.jdx.dev/getting-started.html).
+
 Two toolchains, one source of truth for versions:
 
 - **Docker (authoritative).** `docker/ci-base.Dockerfile` is the image CI runs;
@@ -46,10 +50,12 @@ Two toolchains, one source of truth for versions:
   1.22.22, OTP 28.5.0.4, Elixir 1.20.2 — plus the pinned SQLean extensions,
   and `tooling/validate.sh` then runs the same mix commands CI runs
   (`mix deps.get`, `yarn install`, `mix ecto.create/migrate`,
-  `mix check --no-fix --no-retry`, `mix test`). The suite mocks yt-dlp and
-  apprise (`config/test.exs`), so the suite result still matches CI; the
-  ci-base image's yt-dlp/ffmpeg/Deno/Apprise binaries are **not** reproduced
-  natively, so real media downloads still need Docker.
+  `mix check --no-fix --no-retry`, `mix test`) through the locked toolchain.
+  The suite mocks yt-dlp and apprise (`config/test.exs`), so the suite result
+  still matches CI; the ci-base image's yt-dlp/ffmpeg/Deno/Apprise binaries
+  are **not** reproduced natively, so real media downloads still need Docker.
+  `--clean` and `--shell` behave like their Docker-path counterparts (drop
+  the compiled artifacts / open a shell with the pinned toolchain).
 
 Boundary rules — keep them when editing `.mise/config.toml`:
 
@@ -59,18 +65,21 @@ Boundary rules — keep them when editing `.mise/config.toml`:
   dependencies, the test database and the suite belong to the validation entry
   points, exactly where CI does them.
 - Downloads come only from `.mise/mise.lock` (`locked = true`): exact versions
-  and URLs, checksummed where the backend publishes checksums (the classic-yarn
-  backend locks the exact tarball URL only — the reviewed lockfile diff is the
-  control there). The SQLean archives keep their own pinned SHA-256s in
-  `tooling/fetch-sqlean.sh`, which also verifies them when it falls back to
-  mise's downloader on hosts without curl/unzip. Bump tools by editing
-  `[tools]`, running `mise lock`, and reviewing the lockfile diff like any
-  dependency bump: trusted runners approve the contract by byte-identical
-  comparison against the approved revision, so mise must never rewrite the
-  lock implicitly.
+  and URLs with the publisher's checksum. yarn resolves through the npm
+  backend, so its integrity hash and dependency graph are recorded too — the
+  graph lives in the committed sidecar `.mise/locks/npm-yarn/1.22.22/`, and
+  the lockfile pins that sidecar's digest. The SQLean archives keep their own
+  pinned SHA-256s in `tooling/fetch-sqlean.sh`, which also verifies them when
+  it falls back to mise's downloader on hosts without curl/unzip. Bump tools
+  by editing `[tools]`, running `mise lock`, and reviewing the lockfile diff
+  (and any sidecar diff) like any dependency bump: trusted runners approve the
+  contract by byte-identical comparison against the approved revision, so mise
+  must never rewrite the lock implicitly.
 - The pinned OTP release comes from mise's precompiled build
   (`erlang.precompiled_os = "ubuntu-22.04"`), so a Linux sandbox installs it
-  in seconds instead of compiling OTP from source. Keep the pins in
+  in seconds instead of compiling OTP from source. That build links against
+  the target's glibc (2.34+) and OpenSSL, so it covers Ubuntu 22.04+ and
+  Debian 12+; older or musl hosts use the Docker path. Keep the pins in
   `.mise/config.toml` in sync with `ELIXIR_VERSION` / `OTP_VERSION` /
   `NODE_MAJOR` in `docker/ci-base.Dockerfile`.
 - Run the bootstrap from the approved revision: mise trusts the active config

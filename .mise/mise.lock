@@ -28,21 +28,6 @@ version = "28.5.0.4"
 backend = "core:erlang"
 specifiers = ["28.5.0.4"]
 
-[tools.erlang."platforms.macos-arm64"]
-checksum = "sha256:0d02ada35d41afa90ef1f555d18a96acf8a7beb31119270f110d499f0118a79d"
-url = "https://github.com/erlef/otp_builds/releases/download/OTP-28.5.0.4/otp-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/erlef/otp_builds/releases/assets/491495274"
-
-[tools.erlang."platforms.macos-x64"]
-checksum = "sha256:d6ea47803a2b348f686d74ac7d6ed44017a1160e368df8a3084c4c80745ebc3c"
-url = "https://github.com/erlef/otp_builds/releases/download/OTP-28.5.0.4/otp-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/erlef/otp_builds/releases/assets/491499505"
-
-[[tools.erlang]]
-version = "28.5.0.4"
-backend = "core:erlang"
-specifiers = ["28.5.0.4"]
-
 [tools.erlang.options]
 precompiled_os = "ubuntu-22.04"
 
@@ -53,6 +38,21 @@ url = "https://builds.hex.pm/builds/otp/arm64/ubuntu-22.04/OTP-28.5.0.4.tar.gz"
 [tools.erlang."platforms.linux-x64"]
 checksum = "sha256:29df77ddc31722ad07b38722a77ccedeed28f35a160c0c3ad07645989c2272be"
 url = "https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-28.5.0.4.tar.gz"
+
+[[tools.erlang]]
+version = "28.5.0.4"
+backend = "core:erlang"
+specifiers = ["28.5.0.4"]
+
+[tools.erlang."platforms.macos-arm64"]
+checksum = "sha256:0d02ada35d41afa90ef1f555d18a96acf8a7beb31119270f110d499f0118a79d"
+url = "https://github.com/erlef/otp_builds/releases/download/OTP-28.5.0.4/otp-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/erlef/otp_builds/releases/assets/491495274"
+
+[tools.erlang."platforms.macos-x64"]
+checksum = "sha256:d6ea47803a2b348f686d74ac7d6ed44017a1160e368df8a3084c4c80745ebc3c"
+url = "https://github.com/erlef/otp_builds/releases/download/OTP-28.5.0.4/otp-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/erlef/otp_builds/releases/assets/491499505"
 
 [[tools.node]]
 version = "24.22.2"
@@ -75,19 +75,8 @@ url = "https://nodejs.org/dist/v24.22.2/node-v24.22.2-darwin-arm64.tar.gz"
 checksum = "sha256:d5e336d588c45be0c37dbd52cc29895593009ca4997a77a1fd02815131ed0e52"
 url = "https://nodejs.org/dist/v24.22.2/node-v24.22.2-darwin-x64.tar.gz"
 
-[[tools.yarn]]
+[[tools."npm:yarn"]]
 version = "1.22.22"
-backend = "vfox:jdx/vfox-yarn"
+aube = { path = "locks/npm-yarn/1.22.22", digest = "sha256:fb0a6374649a0fec5fe1999a7cc726567ee94d03802994a1a86b7d2264d470bc" }
+backend = "npm:yarn"
 specifiers = ["1.22.22"]
-
-[tools.yarn."platforms.linux-arm64"]
-url = "https://classic.yarnpkg.com/downloads/1.22.22/yarn-v1.22.22.tar.gz"
-
-[tools.yarn."platforms.linux-x64"]
-url = "https://classic.yarnpkg.com/downloads/1.22.22/yarn-v1.22.22.tar.gz"
-
-[tools.yarn."platforms.macos-arm64"]
-url = "https://classic.yarnpkg.com/downloads/1.22.22/yarn-v1.22.22.tar.gz"
-
-[tools.yarn."platforms.macos-x64"]
-url = "https://classic.yarnpkg.com/downloads/1.22.22/yarn-v1.22.22.tar.gz"

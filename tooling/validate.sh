@@ -38,14 +38,6 @@ case "${MODE}" in
     ;;
 esac
 
-require_tool() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "ERROR: '$1' is not on PATH." >&2
-    echo "       Run 'mise run bootstrap' first - it installs the locked toolchain (Elixir, OTP, Node, yarn) and the pinned SQLean extensions." >&2
-    exit 1
-  fi
-}
-
 # A Docker CLI without a usable daemon (no host socket) must not block the
 # sandbox, and it must not silently pretend the authoritative path ran.
 # Probe the daemon once and say which path is taken.
@@ -62,9 +54,26 @@ if docker_usable; then
 fi
 
 echo "==> No usable Docker daemon: running the native toolchain (same mix commands CI runs, no container)"
-require_tool mix
-if [[ "${MODE}" == "check" ]]; then
-  require_tool yarn
+
+# Run the mix/yarn commands through mise when it is available, so the native
+# path uses the LOCKED toolchain instead of whatever the host happens to
+# have on PATH. `mise exec` also puts the toolchain's bin directories (and
+# the contract's ELIXIR_ERL_OPTIONS) on PATH for the child process.
+if command -v mise >/dev/null 2>&1; then
+  toolchain() { mise exec -- "$@"; }
+else
+  echo "==> mise not found: falling back to the host toolchain"
+  toolchain() { "$@"; }
+  if ! command -v mix >/dev/null 2>&1; then
+    echo "ERROR: mix is not on PATH and mise is not available." >&2
+    echo "       Run 'mise run bootstrap' first - it installs the locked toolchain (Elixir, OTP, Node, yarn) and the pinned SQLean extensions." >&2
+    exit 1
+  fi
+  if [[ "${MODE}" == "check" ]] && ! command -v yarn >/dev/null 2>&1; then
+    echo "ERROR: yarn is not on PATH and mise is not available." >&2
+    echo "       Run 'mise run bootstrap' first - it installs the locked toolchain." >&2
+    exit 1
+  fi
 fi
 
 # The suite's fixtures hardcode /tmp/test/... paths and CI runs with the
@@ -79,25 +88,57 @@ export TMPDIR=/tmp
 export TMP=/tmp
 export TEMP=/tmp
 
+# Mirror the Docker wrappers' own flags on the native path: --clean drops the
+# compiled artifacts (the Docker path drops its cached volumes), --shell
+# drops into an interactive shell (the Docker path opens a shell in the
+# container). Both are stripped from the arguments forwarded to mix.
+CLEAN=0
+SHELL_MODE=0
+ARGS=()
+for arg in "$@"; do
+  case "${arg}" in
+    --clean)
+      CLEAN=1
+      ;;
+    --shell)
+      SHELL_MODE=1
+      ;;
+    *)
+      ARGS+=("${arg}")
+      ;;
+  esac
+done
+
+if [[ "${SHELL_MODE}" == "1" ]]; then
+  echo "==> Opening a shell with the locked toolchain"
+  toolchain bash
+  exit 0
+fi
+
 echo "==> Installing Elixir and JS deps"
-mix local.hex --force >/dev/null
-mix local.rebar --force >/dev/null
-mix deps.get
+toolchain mix local.hex --force >/dev/null
+toolchain mix local.rebar --force >/dev/null
+toolchain mix deps.get
 if [[ "${MODE}" == "check" ]]; then
-  yarn install
-  (cd assets && yarn install)
+  toolchain yarn install
+  (cd assets && toolchain yarn install)
 fi
 
 echo "==> Fetching SQLean extensions"
 ./tooling/fetch-sqlean.sh
 
+if [[ "${CLEAN}" == "1" ]]; then
+  echo "==> Dropping compiled artifacts (native equivalent of the Docker path's --clean)"
+  toolchain mix clean
+fi
+
 case "${MODE}" in
   check)
-    MIX_ENV=test mix ecto.create
-    MIX_ENV=test mix ecto.migrate
-    exec mix check --no-fix --no-retry "$@"
+    MIX_ENV=test toolchain mix ecto.create
+    MIX_ENV=test toolchain mix ecto.migrate
+    toolchain mix check --no-fix --no-retry "${ARGS[@]+"${ARGS[@]}"}"
     ;;
   test)
-    exec mix test "$@"
+    toolchain mix test "${ARGS[@]+"${ARGS[@]}"}"
     ;;
 esac
