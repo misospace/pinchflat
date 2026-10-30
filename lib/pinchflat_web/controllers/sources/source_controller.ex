@@ -12,6 +12,7 @@ defmodule PinchflatWeb.Sources.SourceController do
   alias Pinchflat.Downloading.DownloadingHelpers
   alias Pinchflat.SlowIndexing.SlowIndexingHelpers
   alias Pinchflat.Metadata.SourceMetadataStorageWorker
+  alias PinchflatWeb.Helpers.LayoutHelpers
 
   def index(conn, _params) do
     render(conn, :index)
@@ -28,7 +29,7 @@ defmodule PinchflatWeb.Sources.SourceController do
 
     render(conn, :new,
       media_profiles: media_profiles(),
-      layout: get_onboarding_layout(),
+      layout: LayoutHelpers.get_layout(),
       # Most of these don't actually _need_ to be nullified at this point,
       # but if I don't do it now I know it'll bite me
       changeset:
@@ -61,7 +62,7 @@ defmodule PinchflatWeb.Sources.SourceController do
         render(conn, :new,
           changeset: changeset,
           media_profiles: media_profiles(),
-          layout: get_onboarding_layout()
+          layout: LayoutHelpers.get_layout()
         )
     end
   end
@@ -173,13 +174,5 @@ defmodule PinchflatWeb.Sources.SourceController do
     MediaProfile
     |> order_by(asc: :name)
     |> Repo.all()
-  end
-
-  defp get_onboarding_layout do
-    if Settings.get!(:onboarding) do
-      {Layouts, :onboarding}
-    else
-      {Layouts, :app}
-    end
   end
 end

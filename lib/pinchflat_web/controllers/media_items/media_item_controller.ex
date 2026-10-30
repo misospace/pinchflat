@@ -89,7 +89,6 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
       media_item ->
         if media_item.media_filepath && File.exists?(media_item.media_filepath) do
           file_size = File.stat!(media_item.media_filepath).size
-          mime_type = MIME.from_path(media_item.media_filepath)
 
           case parse_range(conn, file_size) do
             {:ok, {start_pos, end_pos}} ->
@@ -97,14 +96,7 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
               length = end_pos - start_pos + 1
 
               conn
-              |> put_resp_content_type(mime_type)
-              |> put_resp_header("accept-ranges", "bytes")
-              |> put_resp_header("content-range", "bytes #{start_pos}-#{end_pos}/#{file_size}")
-              |> put_resp_header("content-length", to_string(length))
-              |> put_resp_header(
-                "content-disposition",
-                "inline; filename=\"#{StringUtils.to_content_disposition_filename(media_item.title)}\""
-              )
+              |> put_media_file_headers(media_item, "bytes #{start_pos}-#{end_pos}/#{file_size}", length)
               |> send_file(206, media_item.media_filepath, start_pos, length)
 
             {:error, :range_not_satisfiable} ->
@@ -118,14 +110,7 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
               Logger.debug("Invalid range request for media item: #{media_item.uuid} - serving full file")
 
               conn
-              |> put_resp_content_type(mime_type)
-              |> put_resp_header("accept-ranges", "bytes")
-              |> put_resp_header("content-range", "bytes 0-#{file_size - 1}/#{file_size}")
-              |> put_resp_header("content-length", to_string(file_size))
-              |> put_resp_header(
-                "content-disposition",
-                "inline; filename=\"#{StringUtils.to_content_disposition_filename(media_item.title)}\""
-              )
+              |> put_media_file_headers(media_item, "bytes 0-#{file_size - 1}/#{file_size}", file_size)
               |> send_file(200, media_item.media_filepath)
           end
         else
@@ -176,6 +161,19 @@ defmodule PinchflatWeb.MediaItems.MediaItemController do
       {{start_pos, _}, {end_pos, _}} ->
         {:ok, {start_pos, end_pos}}
     end
+  end
+
+  # Headers shared by every media file response that serves file contents
+  defp put_media_file_headers(conn, media_item, content_range, content_length) do
+    conn
+    |> put_resp_content_type(MIME.from_path(media_item.media_filepath))
+    |> put_resp_header("accept-ranges", "bytes")
+    |> put_resp_header("content-range", content_range)
+    |> put_resp_header("content-length", to_string(content_length))
+    |> put_resp_header(
+      "content-disposition",
+      "inline; filename=\"#{StringUtils.to_content_disposition_filename(media_item.title)}\""
+    )
   end
 
   defp file_removal_failure_message(failures) do
