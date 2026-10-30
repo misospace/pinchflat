@@ -1,0 +1,113 @@
+# Repository development-bootstrap contract (misospace/courier#414).
+# `.mise/config.toml` + the committed `.mise/mise.lock` are the contract:
+# trusted runners execute `mise run bootstrap` after checkout, and the
+# runtime captures the activated environment with `mise x -- env` so the
+# pinned toolchain reaches every later command.
+#
+# Two toolchains, one source of truth for versions:
+#   * Docker contract (authoritative): docker/ci-base.Dockerfile, driven by
+#     tooling/test.sh and tooling/lint_test.sh. Used whenever a Docker
+#     daemon is reachable - same image CI runs.
+#   * Native contract (this file): the same pinned Elixir/OTP/Node versions
+#     installed without Docker, for sandboxes with no host Docker socket
+#     (automation workers). tooling/validate.sh falls back to it only when
+#     no usable Docker daemon exists.
+#
+# Tasks stay noninteractive, non-root, idempotent, and free of secrets,
+# git-hook installation, source formatting, migrations and test execution.
+min_version = "2026.10.13"
+
+[settings]
+# Fail closed against the lockfile: installs must match a locked platform
+# entry (exact version + download URL, with checksum where the backend
+# publishes one), and mise never rewrites .mise/mise.lock implicitly (an
+# un-reviewed lock change breaks the byte-identical approval check used
+# by the Courier bootstrap contract). Regenerate with `mise lock` and
+# review the diff like any dependency bump.
+locked = true
+# Every supported contributor/worker platform gets a checksummed entry so
+# `locked = true` installs work on Linux and macOS, amd64 and arm64. The
+# glibc Linux and macOS targets are covered; musl (Alpine) is not - the
+# OTP build has no musl variant, so a musl host uses the Docker path.
+lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "macos-x64"]
+# Bob's precompiled OTP builds target Ubuntu. Pin one target so a single
+# lock installs on Ubuntu 22.04+ and other glibc distributions of the same
+# era (Debian 12+, ...) - without this, mise compiles OTP from source on
+# any non-Ubuntu glibc host, which is far too slow for a bootstrap and
+# impossible in a rootless sandbox. The build links against the target's
+# glibc (2.34+ for ubuntu-22.04) and its OpenSSL, so a host with an older
+# glibc must use the Docker path instead. Keep in sync with OTP_VERSION in
+# docker/ci-base.Dockerfile.
+erlang = { precompiled_os = "ubuntu-22.04" }
+
+[env]
+# The BEAM derives its filename encoding from the locale, and minimal
+# sandboxes often run POSIX/C (latin1), which makes Elixir mishandle UTF-8
+# paths. "+fnu" forces UTF-8 filename handling for every command the
+# contract's environment reaches (tasks, `mise x`, activated shells). The
+# ci-base image gets the same effect from LANG=en_US.UTF-8.
+ELIXIR_ERL_OPTIONS = "+fnu"
+
+[tools]
+# Keep in sync with NODE_MAJOR in docker/ci-base.Dockerfile; `mise lock`
+# pins the exact version + per-platform checksums in .mise/mise.lock.
+node = "24"
+# Same classic yarn line the ci-base image installs via `npm install -g
+# yarn` (the v1 yarn.lock in this repo is not yarn berry). The npm backend
+# resolves it from the registry with the registry's integrity hashes
+# instead of an unverified tarball, and `mise lock` records the dependency
+# graph in the committed sidecar .mise/locks/npm-yarn/1.22.22/ - commit
+# that sidecar with the lockfile, it is part of the contract.
+"npm:yarn" = "1.22.22"
+# Keep in sync with OTP_VERSION in docker/ci-base.Dockerfile. mise installs
+# the precompiled OTP release from builds.hex.pm (checksummed in
+# .mise/mise.lock) - the same OTP release the ci-base image ships.
+erlang = "28.5.0.4"
+# Keep in sync with ELIXIR_VERSION in docker/ci-base.Dockerfile. The
+# "-otp-28" suffix selects the build compiled against OTP 28, matching the
+# ci-base image's hexpm/elixir:1.20.2-erlang-28.5.0.4 base.
+elixir = "1.20.2-otp-28"
+
+[tasks.bootstrap]
+description = "Idempotent noninteractive dev bootstrap: install the locked toolchain (Node, yarn, OTP, Elixir) and the pinned SQLean extensions, then report versions and executable paths (no deps, no tests, no formatting, no git hooks, no secrets, no database)"
+run = """
+set -eu
+echo "==> Contract"
+echo "    revision: $(git rev-parse HEAD 2>/dev/null || echo 'not a git checkout')"
+echo "    mise:     $(mise --version)"
+echo "==> Installing the locked toolchain"
+mise install --locked
+echo "==> Fetching SQLean SQLite extensions"
+./tooling/fetch-sqlean.sh
+echo "==> Toolchain (version + executable path)"
+mise exec -- node --version
+mise exec -- yarn --version
+mise exec -- elixir --version
+mise exec -- erl -noshell -eval 'io:format("Erlang/OTP ~s~n", [erlang:system_info(otp_release)]), halt().'
+for tool in node yarn elixir erl; do
+  echo "    $tool: $(mise which "$tool" 2>/dev/null || echo 'not installed')"
+done
+echo "==> Elixir and JS dependencies, the database and the test suite"
+echo "    installed by the validation entry points, exactly where CI installs them:"
+echo "    mise run test   # tooling/test.sh (Docker) or mix test (native)"
+echo "    mise run check  # tooling/lint_test.sh (Docker) or mix check (native)"
+echo "==> Using the toolchain in later commands"
+echo "    mise x -- mix test             # one-off command with the pinned toolchain"
+echo "    mise activate bash             # persistent shell (run 'mise trust' once if mise asks)"
+"""
+
+[tasks.check]
+description = "Validation gate: tooling/lint_test.sh (full mix check in the pinned ci-base image) when a Docker daemon is usable; otherwise the native toolchain installed by 'mise run bootstrap' runs the same mix check"
+raw_args = true
+run = """
+set -eu
+exec ./tooling/validate.sh check
+"""
+
+[tasks.test]
+description = "Validation loop: tooling/test.sh (mix test in the pinned ci-base image) when a Docker daemon is usable; otherwise the native toolchain installed by 'mise run bootstrap' runs the same mix test. Extra args pass through to mix test"
+raw_args = true
+run = """
+set -eu
+exec ./tooling/validate.sh test
+"""

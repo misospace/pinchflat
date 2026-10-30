@@ -34,6 +34,8 @@ You review and write pull requests for a self-hosted Elixir/Phoenix media manage
   - `tooling/test.sh --shell` — drop into a shell in the container
 - `tooling/lint_test.sh` — **pre-commit gate.** Full `mix check` in the same image. Slower; run once before committing, not while iterating. Shares volumes with `test.sh`.
 
+**Clean-checkout / automation bootstrap.** `.mise/config.toml` + the committed `.mise/mise.lock` are the repository development-bootstrap contract (misospace/courier#414): `mise run bootstrap` idempotently installs the locked toolchain — Node, yarn, OTP `28.5.0.4` and Elixir `1.20.2` (the same releases `docker/ci-base.Dockerfile` ships) — plus the pinned SQLean extensions, then reports versions and executable paths. `mise run check` / `mise run test` take the authoritative Docker path (`tooling/lint_test.sh` / `tooling/test.sh` — the same image CI runs) whenever a Docker daemon is usable, and fall back to the same mix commands on the native toolchain where it is not (automation sandboxes have no host Docker socket). `mise` itself is the one prerequisite the contract cannot install. Details: `DEVELOPMENT.md`.
+
 Dev server: `docker compose up` (app on `http://localhost:4008`). On a Linux box or inside `--shell`, the bare Mix tasks work directly:
 
 ```bash
@@ -96,7 +98,8 @@ For `chore` / `refactor` / `test` / `ci` / internal `perf`, keep writing normal 
 2. `yarn run lint:fix` — auto-fix Prettier so the CI prettier check can't fail.
 3. `tooling/lint_test.sh` — reproduces CI's "Lint and Test" job in the same pinned ci-base image. Green here means green in CI. Requires Docker.
 4. `bash tooling/test_selfhosted_image.sh` — asserts the selfhosted image's yt-dlp path/permission contract (Docker-free; CI runs the same suite plus the image-level checks against the built image).
-5. If you're on `main`, branch first. **Never push unless explicitly asked.** Prefer amending when the work belongs to the same feature or fix.
+5. `bash tooling/test_validate.sh && bash tooling/test_fetch_sqlean.sh` — regression suites for the validation entry point and the SQLean fetch fallbacks (Docker-free; CI runs both in its "Lint and Test" job).
+6. If you're on `main`, branch first. **Never push unless explicitly asked.** Prefer amending when the work belongs to the same feature or fix.
 
 ### Releases
 
