@@ -137,10 +137,15 @@ defmodule Pinchflat.Media.MediaQuery do
     )
   end
 
+  # Disabled sources must not be picked up by the automatic quality-upgrade scan,
+  # same as they don't get indexed or have pending downloads enqueued.
+  def source_enabled, do: dynamic([_mi, source], source.enabled)
+
   def upgradeable do
     dynamic(
       [mi, source],
-      ^downloaded() and
+      ^source_enabled() and
+        ^downloaded() and
         not (^download_prevented()) and
         not (^redownloaded()) and
         ^past_redownload_delay()
