@@ -57,6 +57,16 @@ Two toolchains, one source of truth for versions:
   `--clean` and `--shell` behave like their Docker-path counterparts (drop
   the compiled artifacts / open a shell with the pinned toolchain).
 
+Both fallbacks are covered by Docker-free regression suites, run by CI's
+`Lint and Test` job next to the other tooling suites. They need GNU
+coreutils (`env -i`, `sha256sum`), so they run on Linux dev boxes and CI,
+not macOS:
+
+```bash
+bash tooling/test_validate.sh      # routing, native command sequence, failure modes
+bash tooling/test_fetch_sqlean.sh  # digest enforcement, mise fallback, staging swap
+```
+
 Boundary rules — keep them when editing `.mise/config.toml`:
 
 - The bootstrap installs tools and the SQLean extensions only. It never runs

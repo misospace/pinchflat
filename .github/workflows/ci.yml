@@ -68,6 +68,16 @@ jobs:
         run: |
           bash tooling/test_selfhosted_image.sh
 
+      # CI's own job exercises the authoritative Docker validation path; the
+      # no-Docker fallback in tooling/validate.sh and the mise-download /
+      # staging paths in tooling/fetch-sqlean.sh would otherwise ship
+      # untested. Run their regression suites (issue #165 review) so a broken
+      # fallback fails the ordinary PR gate.
+      - name: Test validation entry point and SQLean fetch fallbacks
+        run: |
+          bash tooling/test_validate.sh
+          bash tooling/test_fetch_sqlean.sh
+
       # Cache compiled deps and node_modules keyed on the lockfiles. Unlike the
       # old Docker-layer cache (which rarely hit), this restores the actual
       # deps/_build/node_modules dirs the steps below read from.
