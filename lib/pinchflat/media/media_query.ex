@@ -204,7 +204,7 @@ defmodule Pinchflat.Media.MediaQuery do
             coalesce(snippet(media_items_search_index, 1, '[PF_HIGHLIGHT]', '[/PF_HIGHLIGHT]', '...', 20), '')
           """)
       },
-      order_by: [desc: fragment("rank")]
+      order_by: [asc: fragment("rank")]
     )
   end
 
