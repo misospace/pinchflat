@@ -557,4 +557,139 @@ defmodule Pinchflat.Metadata.SourceMetadataStorageWorkerTest do
       refute source.nfo_filepath
     end
   end
+
+  describe "perform/1 when cleaning up the scratch image directory" do
+    # The worker hands yt-dlp a random per-invocation directory under the tmpfile
+    # root via the :output option. The mocked runner extracts it, emulates yt-dlp
+    # having downloaded images into it, and reports the path back to the test.
+    defp scratch_metadata_json(scratch_dir) do
+      Phoenix.json_library().encode!(%{
+        "channel" => "PinchflatTestChannel",
+        "description" => "This is a test file for Pinchflat",
+        "thumbnails" => [
+          %{
+            "id" => "avatar_uncropped",
+            "filepath" => Path.join(scratch_dir, "source_image.jpg"),
+            "width" => 100,
+            "height" => 100
+          },
+          %{
+            "id" => "banner_uncropped",
+            "filepath" => Path.join(scratch_dir, "fanart.jpg"),
+            "width" => 100,
+            "height" => 100
+          },
+          %{
+            "id" => "0",
+            "filepath" => Path.join(scratch_dir, "banner.jpg"),
+            "width" => 1280,
+            "height" => 400
+          }
+        ]
+      })
+    end
+
+    defp receive_scratch_dir do
+      receive do
+        {:image_scratch_dir, dir} -> dir
+      after
+        0 -> flunk("the worker never handed a scratch image directory to yt-dlp")
+      end
+    end
+
+    test "removes the scratch directory on success while persistent copies survive" do
+      stub(YtDlpRunnerMock, :run, fn
+        _url, :get_source_details, _opts, _ot, _addl ->
+          {:ok, source_details_return_fixture()}
+
+        _url, :get_source_metadata, opts, _ot, _addl ->
+          scratch_dir = opts |> Keyword.fetch!(:output) |> Path.dirname()
+          File.mkdir_p!(scratch_dir)
+          File.write!(Path.join(scratch_dir, "source_image.jpg"), "poster")
+          File.write!(Path.join(scratch_dir, "fanart.jpg"), "fanart")
+          File.write!(Path.join(scratch_dir, "banner.jpg"), "banner")
+          # Unselected artwork must disappear with the directory, not linger
+          File.write!(Path.join(scratch_dir, "unselected.jpg"), "unselected")
+          send(self(), {:image_scratch_dir, scratch_dir})
+
+          {:ok, scratch_metadata_json(scratch_dir)}
+      end)
+
+      source = source_fixture()
+
+      assert :ok = perform_job(SourceMetadataStorageWorker, %{id: source.id})
+      source = Repo.preload(Repo.reload(source), :metadata)
+
+      assert File.exists?(source.metadata.poster_filepath)
+      assert File.exists?(source.metadata.fanart_filepath)
+      assert File.exists?(source.metadata.banner_filepath)
+
+      refute File.exists?(receive_scratch_dir())
+    end
+
+    test "removes the scratch directory when the metadata fetch fails" do
+      stub(YtDlpRunnerMock, :run, fn
+        _url, :get_source_details, _opts, _ot, _addl ->
+          {:ok, source_details_return_fixture()}
+
+        _url, :get_source_metadata, opts, _ot, _addl ->
+          scratch_dir = opts |> Keyword.fetch!(:output) |> Path.dirname()
+          File.mkdir_p!(scratch_dir)
+          File.write!(Path.join(scratch_dir, "source_image.jpg"), "leftover")
+          send(self(), {:image_scratch_dir, scratch_dir})
+
+          {:error, "Some unrelated error", 1}
+      end)
+
+      source = source_fixture()
+
+      assert {:error, :source_metadata_fetch_failed} = perform_job(SourceMetadataStorageWorker, %{id: source.id})
+
+      refute File.exists?(receive_scratch_dir())
+    end
+
+    test "removes the scratch directory when the response cannot be decoded" do
+      stub(YtDlpRunnerMock, :run, fn
+        _url, :get_source_details, _opts, _ot, _addl ->
+          {:ok, source_details_return_fixture()}
+
+        _url, :get_source_metadata, opts, _ot, _addl ->
+          scratch_dir = opts |> Keyword.fetch!(:output) |> Path.dirname()
+          File.mkdir_p!(scratch_dir)
+          File.write!(Path.join(scratch_dir, "source_image.jpg"), "leftover")
+          send(self(), {:image_scratch_dir, scratch_dir})
+
+          # An empty/truncated response - eg. after a yt-dlp behaviour change - fails to decode
+          {:ok, ""}
+      end)
+
+      source = source_fixture()
+
+      assert {:error, :source_metadata_fetch_failed} = perform_job(SourceMetadataStorageWorker, %{id: source.id})
+
+      refute File.exists?(receive_scratch_dir())
+    end
+
+    test "removes the scratch directory when the fetch raises" do
+      stub(YtDlpRunnerMock, :run, fn
+        _url, :get_source_details, _opts, _ot, _addl ->
+          {:ok, source_details_return_fixture()}
+
+        _url, :get_source_metadata, opts, _ot, _addl ->
+          scratch_dir = opts |> Keyword.fetch!(:output) |> Path.dirname()
+          File.mkdir_p!(scratch_dir)
+          send(self(), {:image_scratch_dir, scratch_dir})
+
+          raise "boom"
+      end)
+
+      source = source_fixture()
+
+      assert_raise RuntimeError, "boom", fn ->
+        perform_job(SourceMetadataStorageWorker, %{id: source.id})
+      end
+
+      refute File.exists?(receive_scratch_dir())
+    end
+  end
 end

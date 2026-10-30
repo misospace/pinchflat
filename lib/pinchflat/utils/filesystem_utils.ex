@@ -135,6 +135,70 @@ defmodule Pinchflat.Utils.FilesystemUtils do
   end
 
   @doc """
+  Removes a per-invocation scratch directory that this process generated directly
+  beneath the tmpfile directory - eg. the random image directory the source-metadata
+  worker hands to yt-dlp.
+
+  Only point this at directories THIS process generated with a random name under
+  the tmpfile root. It is not for caller- or metadata-derived paths: cleanup
+  refuses - with a warning - any path that is not a real directory (per
+  `File.lstat/1`, so a symlink cannot redirect removal) located directly under
+  the tmpfile directory, and the tmpfile directory itself never qualifies.
+  `File.rm_rf/1` unlinks rather than descends into symlinks, so a planted link
+  inside the directory is removed as a link, not followed. Removal failure is
+  logged and swallowed: leaking a scratch directory beats crashing the job.
+  Like `cleanup_metadata_tmpfile/1`'s guard, this is best-effort containment
+  for a shared root, not a closed race: a swap landing between the `lstat`
+  check and the removal would need openat-style unlinking the stdlib does not
+  expose.
+
+  Returns :ok
+  """
+  def cleanup_tmpfile_directory(directory) when is_binary(directory) do
+    case File.lstat(directory) do
+      # Nothing was ever created (or it is already gone): a benign no-op, matching
+      # `cleanup_metadata_tmpfile/1`'s enoent handling.
+      {:error, :enoent} ->
+        :ok
+
+      {:ok, %File.Stat{type: :directory}} ->
+        if directly_under_tmpfile_root?(directory) do
+          remove_tmpfile_directory(directory)
+        else
+          Logger.warning("Refusing to clean tmpfile directory #{directory}: not directly under the tmpfile directory")
+
+          :ok
+        end
+
+      # A file or a symlink (dangling or not): refusing - with a warning - beats
+      # unlinking something this process did not generate as a directory.
+      _other ->
+        Logger.warning(
+          "Refusing to clean tmpfile directory #{directory}: not a real directory directly under the tmpfile directory"
+        )
+
+        :ok
+    end
+  end
+
+  defp remove_tmpfile_directory(directory) do
+    case File.rm_rf(directory) do
+      {:ok, _removed} ->
+        :ok
+
+      {:error, reason, _path} ->
+        Logger.warning("Failed to clean tmpfile directory #{directory}: #{inspect(reason)}")
+
+        :ok
+    end
+  end
+
+  defp directly_under_tmpfile_root?(directory) do
+    Path.type(directory) == :absolute &&
+      Path.dirname(directory) == Application.get_env(:pinchflat, :tmpfile_directory)
+  end
+
+  @doc """
   Writes content to a file, creating directories as needed.
   Takes the same args as File.write/3.
 
