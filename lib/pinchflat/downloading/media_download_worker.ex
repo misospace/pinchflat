@@ -111,7 +111,17 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
 
         :ok
 
-      {:recovered, _media_item, _message} ->
+      {:recovered, media_item, _message} ->
+        # Recovery persists the metadata parsed from the partial download attempt, but
+        # those attrs also include the would-be filepath and download timestamp, which
+        # would make the item look fully downloaded and drop it from the pending set.
+        # The retried attempt would then no-op without ever invoking yt-dlp. Reset the
+        # download-completion markers so the retried attempt runs the downloader for
+        # real. The recovered metadata is kept, and last_error is only cleared when
+        # that attempt succeeds.
+        {:ok, _} =
+          Media.update_media_item(media_item, %{media_filepath: nil, media_downloaded_at: nil})
+
         {:error, :retry}
 
       {:error, :unsuitable_for_download, _message} ->

@@ -122,6 +122,54 @@ defmodule Pinchflat.Downloading.MediaDownloadWorkerTest do
       end)
     end
 
+    test "runs the downloader again on the attempt after a recovery", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 3, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl ->
+          {:ok, "{}"}
+
+        _url, :download, _opts, _ot, addl ->
+          [{:output_filepath, filepath} | _] = addl
+          File.write(filepath, render_metadata(:media_metadata))
+
+          {:error, "Unable to communicate with SponsorBlock", 1}
+
+        _url, :download_thumbnail, _opts, _ot, _addl ->
+          {:ok, ""}
+      end)
+
+      expect(YtDlpRunnerMock, :run, 3, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl ->
+          {:ok, "{}"}
+
+        _url, :download, _opts, _ot, _addl ->
+          {:ok, render_metadata(:media_metadata)}
+
+        _url, :download_thumbnail, _opts, _ot, _addl ->
+          {:ok, ""}
+      end)
+
+      # First attempt: the download fails recoverably and the partial metadata is saved
+      assert {:error, :retry} = perform_job(MediaDownloadWorker, %{id: media_item.id})
+
+      media_item = Repo.reload(media_item)
+
+      # The recovered metadata is preserved, but the unresolved recovery isn't treated
+      # as a completed download and the error isn't cleared yet
+      assert media_item.metadata != nil
+      assert media_item.media_filepath == nil
+      assert media_item.media_downloaded_at == nil
+      assert media_item.last_error != nil
+      assert Media.pending_download?(media_item)
+
+      # Second attempt: invokes yt-dlp again instead of no-op'ing as a completed download
+      assert :ok = perform_job(MediaDownloadWorker, %{id: media_item.id})
+
+      media_item = Repo.reload(media_item)
+
+      assert media_item.media_filepath != nil
+      assert media_item.last_error == nil
+    end
+
     test "does not set the job to retryable if retrying wouldn't fix the issue", %{media_item: media_item} do
       expect(YtDlpRunnerMock, :run, 2, fn
         _url, :get_downloadable_status, _opts, _ot, _addl -> {:ok, "{}"}
