@@ -34,14 +34,14 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
 
   @doc """
   For a given media item, download the media alongside any options.
-  Does not download media if its source is set to not download media
+  Does not download media if its source is disabled or set to not download media
   (unless forced).
 
   Options:
-    - `force`: force download even if the source is set to not download media. Fully
-      re-downloads media, including the video
+    - `force`: force download even if the source is disabled or set to not download
+      media. Fully re-downloads media, including the video
     - `quality_upgrade?`: re-downloads media, including the video. Does not force download
-      if the source is set to not download media
+      if the source is disabled or set to not download media
 
   Returns :ok | {:error, any, ...any}
   """
@@ -62,10 +62,14 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
     Ecto.StaleEntryError -> Logger.info("#{__MODULE__} discarded: media item #{media_item_id} stale")
   end
 
-  # If this is a quality upgrade, only check if the source is set to download media
-  # or that the media item's download hasn't been prevented
+  # If this is a quality upgrade, additionally check that the source is enabled and
+  # set to download media, and that the media item's download hasn't been prevented.
+  # The source can be disabled after this job has been enqueued (disabling a source
+  # only cancels tasks for its _pending_ media items), so this is re-checked here.
   defp should_download_media?(media_item, should_force, true = _is_quality_upgrade) do
-    (media_item.source.download_media && !media_item.prevent_download) || should_force
+    source = media_item.source
+
+    (source.enabled && source.download_media && !media_item.prevent_download) || should_force
   end
 
   # If it's not a quality upgrade, additionally check if the media item is pending download

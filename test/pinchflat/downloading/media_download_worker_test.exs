@@ -423,6 +423,30 @@ defmodule Pinchflat.Downloading.MediaDownloadWorkerTest do
       perform_job(MediaDownloadWorker, %{id: media_item.id, quality_upgrade?: true})
     end
 
+    test "doesn't redownload if the source was disabled after the job was enqueued", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 0, fn _url, :download, _opts, _ot, _addl -> :ok end)
+
+      Sources.update_source(media_item.source, %{enabled: false})
+
+      perform_job(MediaDownloadWorker, %{id: media_item.id, quality_upgrade?: true})
+
+      assert Repo.reload(media_item).media_redownloaded_at == nil
+    end
+
+    test "redownloads a disabled source's media item if the download is forced", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 3, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl -> {:ok, "{}"}
+        _url, :download, _opts, _ot, _addl -> {:ok, render_metadata(:media_metadata)}
+        _url, :download_thumbnail, _opts, _ot, _addl -> {:ok, ""}
+      end)
+
+      Sources.update_source(media_item.source, %{enabled: false})
+
+      perform_job(MediaDownloadWorker, %{id: media_item.id, quality_upgrade?: true, force: true})
+
+      assert Repo.reload(media_item).media_redownloaded_at != nil
+    end
+
     test "sets force_overwrites runner option", %{media_item: media_item} do
       expect(YtDlpRunnerMock, :run, 3, fn
         _url, :get_downloadable_status, _opts, _ot, _addl ->

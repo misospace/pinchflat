@@ -44,6 +44,9 @@ defmodule Pinchflat.Media do
   This also makes things work as expected when downloading media from a source for the
   first time.
 
+  Media items of disabled sources are excluded: disabling a source stops its automatic
+  downloads, and the daily quality-upgrade scan is one of them.
+
   Returns [%MediaItem{}, ...]
   """
   def list_upgradeable_media_items do

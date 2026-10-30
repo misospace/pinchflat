@@ -94,6 +94,26 @@ defmodule Pinchflat.MediaTest do
       assert Media.list_upgradeable_media_items() == []
     end
 
+    test "does not return media items of a disabled source", %{media_profile: media_profile, source: source} do
+      media_item =
+        media_item_fixture(%{
+          source_id: source.id,
+          uploaded_at: now_minus(6, :days),
+          media_downloaded_at: now_minus(5, :days)
+        })
+
+      disabled_source = source_fixture(%{media_profile_id: media_profile.id, enabled: false})
+
+      _disabled_media_item =
+        media_item_fixture(%{
+          source_id: disabled_source.id,
+          uploaded_at: now_minus(6, :days),
+          media_downloaded_at: now_minus(5, :days)
+        })
+
+      assert Media.list_upgradeable_media_items() == [media_item]
+    end
+
     test "does not return media items that have been culled", %{source: source} do
       _media_item =
         media_item_fixture(%{
