@@ -18,6 +18,40 @@ mix setup              # deps + DB create/migrate/seed + assets
 iex -S mix phx.server  # http://localhost:4008
 ```
 
+## Reproducible Bootstrap (mise — clean checkouts & automation)
+
+`.mise/config.toml` + the committed `.mise/mise.lock` implement the repository
+development-bootstrap contract ([misospace/courier#414](https://github.com/misospace/courier/issues/414)):
+trusted runners execute `mise run bootstrap` right after checkout and carry the
+activated environment (PATH to the pinned tools) into subsequent commands.
+
+```bash
+mise run bootstrap   # idempotent setup: installs locked tools, reports versions/paths
+mise run check       # delegates to tooling/lint_test.sh (needs Docker)
+mise run test        # delegates to tooling/test.sh; extra args pass through (needs Docker)
+```
+
+Boundary rules — keep them when editing `.mise/config.toml`:
+
+- The authoritative toolchain stays `docker/ci-base.Dockerfile`, driven by
+  `tooling/test.sh` / `tooling/lint_test.sh`. mise pins only Node and yarn
+  (matching the image's `NODE_MAJOR`) for direct JS/asset/Prettier use. It
+  deliberately does **not** install Elixir/OTP, run tests, format or change
+  tracked source, install git hooks, touch databases, or require secrets.
+- Downloads come only from `.mise/mise.lock` (`locked = true`): exact versions
+  and URLs, checksummed where the backend publishes checksums (the classic-yarn
+  backend locks the exact tarball URL only — the reviewed lockfile diff is the
+  control there). Bump tools by editing `[tools]`, running `mise lock`, and
+  reviewing the lockfile diff like any dependency bump: trusted runners approve
+  the contract by byte-identical comparison against the approved revision, so
+  mise must never rewrite the lock implicitly.
+- Where Docker is unavailable (e.g. automation workers), `mise run check` /
+  `mise run test` fail with an explicit message instead of degrading to a
+  native `mix` run that cannot match CI. When bootstrap behaviour changes,
+  record a clean-environment receipt — revision, command, tool versions,
+  result, limitations — in the PR, and re-run setup once more to prove
+  idempotency.
+
 ## Tests
 
 ```bash

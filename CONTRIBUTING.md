@@ -33,7 +33,15 @@ Open an issue. Check for duplicates first. For bugs, include your Docker version
 
 ### Development setup
 
-TBA
+From a clean checkout, the noninteractive setup entry point is the mise
+bootstrap contract: `mise run bootstrap` installs the pinned Node/yarn
+toolchain, reports versions and executable paths, and reports whether the
+authoritative validation entry points are available. Validation itself stays
+with the Docker wrappers — `tooling/test.sh` for fast iteration and
+`tooling/lint_test.sh` for the full CI-equivalent `mix check` gate (both need
+Docker plus a one-time `docker login ghcr.io`); `mise run check` /
+`mise run test` delegate to them. See `DEVELOPMENT.md`
+("Reproducible Bootstrap") and `AGENTS.md` for the day-to-day loop.
 
 ## Release process
 

@@ -1,0 +1,83 @@
+# Repository development-bootstrap contract (misospace/courier#414).
+# `.mise/config.toml` + the committed `.mise/mise.lock` are the contract:
+# trusted runners execute `mise run bootstrap` after checkout and inherit
+# the activated environment from `mise x`. Tasks here must stay
+# noninteractive, non-root, idempotent, and free of secrets, git-hook
+# installation, source formatting, migrations and test execution.
+#
+# The AUTHORITATIVE toolchain stays docker/ci-base.Dockerfile (Elixir/OTP,
+# ffmpeg, Deno, yt-dlp, Apprise, SQLean) driven by tooling/test.sh and
+# tooling/lint_test.sh. This contract deliberately does NOT replace it
+# with a bare Elixir install; it pins only the Node/yarn side (matching
+# the image's NODE_MAJOR) so JS/asset/prettier tooling works directly,
+# and keeps `check`/`test` delegating to the Docker wrappers so they
+# fail clearly instead of silently drifting from CI where Docker is
+# unavailable.
+min_version = "2026.10.13"
+
+[settings]
+# Fail closed against the lockfile: installs must match a locked platform
+# entry (exact version + download URL, with checksum where the backend
+# publishes one), and mise never rewrites .mise/mise.lock implicitly (an
+# un-reviewed lock change breaks the byte-identical approval check used
+# by the Courier bootstrap contract). Regenerate with `mise lock` and
+# review the diff like any dependency bump.
+locked = true
+# Every supported contributor/worker platform gets a checksummed entry so
+# `locked = true` installs work on Linux and macOS, amd64 and arm64.
+lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "macos-x64"]
+
+[tools]
+# Keep in sync with NODE_MAJOR in docker/ci-base.Dockerfile; `mise lock`
+# pins the exact version + per-platform checksums in .mise/mise.lock.
+node = "24"
+# Same classic yarn line the ci-base image installs via `npm install -g
+# yarn` (the v1 yarn.lock in this repo is not yarn berry). Its backend
+# locks the exact pinned tarball URL but publishes no checksum; the
+# committed lockfile diff is the review control for it.
+yarn = "1.22.22"
+
+[tasks.bootstrap]
+description = "Idempotent noninteractive dev bootstrap: install locked tools, report versions/paths and authoritative-entry-point availability (no tests, no formatting, no git hooks, no secrets, no DB)"
+# Runs from a pristine materialization of the approved revision on trusted
+# runners and from any clean checkout locally, so it must only ever touch
+# mise-managed tool installs and untracked caches.
+run = """
+set -eu
+mise install --locked
+echo "==> Pinned toolchain (versions + executable paths)"
+mise version
+echo "node: $(command -v node) $(node --version)"
+echo "yarn: $(command -v yarn) $(yarn --version)"
+echo "==> Authoritative entry points (tooling/test.sh, tooling/lint_test.sh)"
+if command -v docker >/dev/null 2>&1; then
+  echo "docker: available ($(docker --version)); repo validation is runnable (private image needs a one-time 'docker login ghcr.io')"
+else
+  echo "docker: NOT available - repo validation (mise run check / mise run test) cannot run in this environment until an approved image or direct entry point exists; Elixir/OTP lives in docker/ci-base.Dockerfile and is intentionally not provided by mise"
+fi
+"""
+
+[tasks.check]
+description = "Authoritative CI-equivalent gate: tooling/lint_test.sh (full mix check in the pinned ci-base image; requires Docker + one-time 'docker login ghcr.io')"
+run = """
+set -eu
+command -v docker >/dev/null 2>&1 || {
+  echo "ERROR: docker is required for 'mise run check' - it delegates to tooling/lint_test.sh, which runs mix check inside the pinned private ci-base image. No host Docker here means no authoritative validation; do not substitute bare native mix check." >&2
+  exit 1
+}
+tooling/lint_test.sh
+"""
+
+[tasks.test]
+description = "Authoritative test iteration: tooling/test.sh (mix test in the pinned ci-base image; requires Docker). Extra task args are forwarded, e.g. 'mise run test test/path/to/file_test.exs:42'"
+run = """
+set -eu
+command -v docker >/dev/null 2>&1 || {
+  echo "ERROR: docker is required for 'mise run test' - it delegates to tooling/test.sh, which runs mix test inside the pinned private ci-base image. No host Docker here means no authoritative validation; do not substitute bare native mix test." >&2
+  exit 1
+}
+# mise forwards extra task args by appending them to the LAST command of
+# this script - keep `tooling/test.sh` as the final line or the args
+# silently stop reaching `mix test`.
+tooling/test.sh
+"""
