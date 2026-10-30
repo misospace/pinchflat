@@ -18,6 +18,8 @@ defmodule Pinchflat.Utils.CliUtils do
   Custom options:
     - logging_arg_override: if set, the passed value will be logged in place of
       the actual arguments passed to the command
+    - redact: a list of secret strings that will be scrubbed from the log
+      messages (both the argument line and any logged command output)
     - expected_exit_codes: exit codes (besides 0) that the caller treats as a
       normal outcome and handles itself — these are logged at debug instead of
       error so routine exits (eg: yt-dlp's 101 on --break-on-existing) don't
@@ -31,13 +33,26 @@ defmodule Pinchflat.Utils.CliUtils do
     command_opts = set_command_opts() ++ passthrough_opts
     logging_arg_override = Keyword.get(opts, :logging_arg_override, Enum.join(args, " "))
     expected_exit_codes = Keyword.get(opts, :expected_exit_codes, [])
+    redact = Keyword.get(opts, :redact, [])
 
-    Logger.info("[command_wrapper]: #{command} called with: #{logging_arg_override}")
+    Logger.info("[command_wrapper]: #{command} called with: #{redact_text(logging_arg_override, redact)}")
 
     {output, status} = System.cmd(wrapper_command, actual_command, command_opts)
-    log_cmd_result(command, logging_arg_override, status, output, expected_exit_codes)
+    log_cmd_result(command, logging_arg_override, status, output, expected_exit_codes, redact)
 
     {output, status}
+  end
+
+  @doc """
+  Scrubs each secret in `redact` from `text`, replacing occurrences with "[redacted]".
+
+  Blank and nil secrets are ignored. Returns binary().
+  """
+  def redact_text(text, redact) do
+    redact
+    |> List.wrap()
+    |> Enum.reject(&(&1 == "" or is_nil(&1)))
+    |> Enum.reduce(text, fn secret, acc -> String.replace(acc, secret, "[redacted]") end)
   end
 
   @doc """
@@ -81,8 +96,10 @@ defmodule Pinchflat.Utils.CliUtils do
     acc ++ [arg]
   end
 
-  defp log_cmd_result(command, logging_arg_override, status, output, expected_exit_codes) do
-    log_message = "[command_wrapper]: #{command} called with: #{logging_arg_override} exited: #{status} with: #{output}"
+  defp log_cmd_result(command, logging_arg_override, status, output, expected_exit_codes, redact) do
+    log_message =
+      "[command_wrapper]: #{command} called with: #{redact_text(logging_arg_override, redact)} exited: #{status} with: #{redact_text(output, redact)}"
+
     log_level = if status == 0 || status in expected_exit_codes, do: :debug, else: :error
 
     Logger.log(log_level, log_message)
