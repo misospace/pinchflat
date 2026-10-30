@@ -8,6 +8,7 @@ defmodule PinchflatWeb.MediaProfiles.MediaProfileController do
   alias Pinchflat.Sources.Source
   alias Pinchflat.Profiles.MediaProfile
   alias Pinchflat.Profiles.MediaProfileDeletionWorker
+  alias PinchflatWeb.Helpers.LayoutHelpers
 
   def index(conn, _params) do
     media_profiles_query =
@@ -38,7 +39,7 @@ defmodule PinchflatWeb.MediaProfiles.MediaProfileController do
       end
 
     render(conn, :new,
-      layout: get_onboarding_layout(),
+      layout: LayoutHelpers.get_layout(),
       changeset:
         Profiles.change_media_profile(%MediaProfile{
           cs_struct
@@ -60,7 +61,7 @@ defmodule PinchflatWeb.MediaProfiles.MediaProfileController do
         |> redirect(to: redirect_location)
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        render(conn, :new, changeset: changeset, layout: get_onboarding_layout())
+        render(conn, :new, changeset: changeset, layout: LayoutHelpers.get_layout())
     end
   end
 
@@ -108,13 +109,5 @@ defmodule PinchflatWeb.MediaProfiles.MediaProfileController do
     conn
     |> put_flash(:info, "Media Profile deletion started. This may take a while to complete.")
     |> redirect(to: ~p"/media_profiles")
-  end
-
-  defp get_onboarding_layout do
-    if Settings.get!(:onboarding) do
-      {Layouts, :onboarding}
-    else
-      {Layouts, :app}
-    end
   end
 end
