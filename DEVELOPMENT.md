@@ -11,7 +11,10 @@ docker compose up
 
 ## Dev Server (Native)
 
-Requires Elixir 1.17+, OTP 27, Node 24, Yarn, yt-dlp, ffmpeg.
+Requires Elixir 1.17+, OTP 27, Node 24, Yarn, yt-dlp, ffmpeg. `mise run
+bootstrap` (see below) installs the pinned Elixir/OTP/Node/yarn releases, but
+not yt-dlp/ffmpeg — those stay in the ci-base image, so run the dev server
+from Docker when you need real downloads.
 
 ```bash
 mix setup              # deps + DB create/migrate/seed + assets
@@ -26,31 +29,60 @@ trusted runners execute `mise run bootstrap` right after checkout and carry the
 activated environment (PATH to the pinned tools) into subsequent commands.
 
 ```bash
-mise run bootstrap   # idempotent setup: installs locked tools, reports versions/paths
-mise run check       # delegates to tooling/lint_test.sh (needs Docker)
-mise run test        # delegates to tooling/test.sh; extra args pass through (needs Docker)
+mise run bootstrap   # idempotent setup: installs the locked toolchain + SQLean, reports versions/paths
+mise run check       # full `mix check` gate — Docker path when a daemon is usable, native otherwise
+mise run test        # `mix test` loop — Docker path when a daemon is usable, native otherwise
+                     # (extra args pass through: mise run test test/path/to/file_test.exs:42)
 ```
+
+Two toolchains, one source of truth for versions:
+
+- **Docker (authoritative).** `docker/ci-base.Dockerfile` is the image CI runs;
+  `tooling/lint_test.sh` (full `mix check`) and `tooling/test.sh` (fast
+  `mix test`) drive it. `mise run check` / `mise run test` take this path
+  whenever a Docker daemon is usable — same image, same commands, same result.
+- **Native (fallback for sandboxes without a host Docker socket).** The
+  bootstrap installs the same pinned releases the image ships — Node 24, yarn
+  1.22.22, OTP 28.5.0.4, Elixir 1.20.2 — plus the pinned SQLean extensions,
+  and `tooling/validate.sh` then runs the same mix commands CI runs
+  (`mix deps.get`, `yarn install`, `mix ecto.create/migrate`,
+  `mix check --no-fix --no-retry`, `mix test`). The suite mocks yt-dlp and
+  apprise (`config/test.exs`), so the suite result still matches CI; the
+  ci-base image's yt-dlp/ffmpeg/Deno/Apprise binaries are **not** reproduced
+  natively, so real media downloads still need Docker.
 
 Boundary rules — keep them when editing `.mise/config.toml`:
 
-- The authoritative toolchain stays `docker/ci-base.Dockerfile`, driven by
-  `tooling/test.sh` / `tooling/lint_test.sh`. mise pins only Node and yarn
-  (matching the image's `NODE_MAJOR`) for direct JS/asset/Prettier use. It
-  deliberately does **not** install Elixir/OTP, run tests, format or change
-  tracked source, install git hooks, touch databases, or require secrets.
+- The bootstrap installs tools and the SQLean extensions only. It never runs
+  the test suite, never formats or changes tracked source, never installs git
+  hooks, never touches a database, and never needs secrets. Elixir/JS
+  dependencies, the test database and the suite belong to the validation entry
+  points, exactly where CI does them.
 - Downloads come only from `.mise/mise.lock` (`locked = true`): exact versions
   and URLs, checksummed where the backend publishes checksums (the classic-yarn
   backend locks the exact tarball URL only — the reviewed lockfile diff is the
-  control there). Bump tools by editing `[tools]`, running `mise lock`, and
-  reviewing the lockfile diff like any dependency bump: trusted runners approve
-  the contract by byte-identical comparison against the approved revision, so
-  mise must never rewrite the lock implicitly.
-- Where Docker is unavailable (e.g. automation workers), `mise run check` /
-  `mise run test` fail with an explicit message instead of degrading to a
-  native `mix` run that cannot match CI. When bootstrap behaviour changes,
-  record a clean-environment receipt — revision, command, tool versions,
-  result, limitations — in the PR, and re-run setup once more to prove
-  idempotency.
+  control there). The SQLean archives keep their own pinned SHA-256s in
+  `tooling/fetch-sqlean.sh`, which also verifies them when it falls back to
+  mise's downloader on hosts without curl/unzip. Bump tools by editing
+  `[tools]`, running `mise lock`, and reviewing the lockfile diff like any
+  dependency bump: trusted runners approve the contract by byte-identical
+  comparison against the approved revision, so mise must never rewrite the
+  lock implicitly.
+- The pinned OTP release comes from mise's precompiled build
+  (`erlang.precompiled_os = "ubuntu-22.04"`), so a Linux sandbox installs it
+  in seconds instead of compiling OTP from source. Keep the pins in
+  `.mise/config.toml` in sync with `ELIXIR_VERSION` / `OTP_VERSION` /
+  `NODE_MAJOR` in `docker/ci-base.Dockerfile`.
+- Run the bootstrap from the approved revision: mise trusts the active config
+  for `mise run` / `mise install`, so the checkout — not the task — is the
+  trust boundary. The bootstrap prints the revision it ran against.
+- The native path pins `TMPDIR`/`TMP`/`TEMP` to `/tmp`: the suite's fixtures
+  hardcode `/tmp/test/...` paths and CI runs with the platform default, so a
+  sandbox that overrides the temp dir would otherwise compile the test config
+  against a different root than the fixtures expect.
+- When bootstrap behaviour changes, record a clean-environment receipt —
+  revision, command, tool versions, result, limitations — in the PR, and
+  re-run setup once more to prove idempotency.
 
 ## Tests
 

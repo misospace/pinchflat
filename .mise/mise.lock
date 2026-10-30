@@ -2,6 +2,58 @@
 
 lockfile_version = 3
 
+[[tools.elixir]]
+version = "1.20.2-otp-28"
+backend = "core:elixir"
+specifiers = ["1.20.2-otp-28"]
+
+[tools.elixir."platforms.linux-arm64"]
+checksum = "sha256:5559e5c496ad959bde0bab4dd2b7e92757a0bd45fba6fc58d35584a8337d0ad1"
+url = "https://builds.hex.pm/builds/elixir/v1.20.2-otp-28.zip"
+
+[tools.elixir."platforms.linux-x64"]
+checksum = "sha256:5559e5c496ad959bde0bab4dd2b7e92757a0bd45fba6fc58d35584a8337d0ad1"
+url = "https://builds.hex.pm/builds/elixir/v1.20.2-otp-28.zip"
+
+[tools.elixir."platforms.macos-arm64"]
+checksum = "sha256:5559e5c496ad959bde0bab4dd2b7e92757a0bd45fba6fc58d35584a8337d0ad1"
+url = "https://builds.hex.pm/builds/elixir/v1.20.2-otp-28.zip"
+
+[tools.elixir."platforms.macos-x64"]
+checksum = "sha256:5559e5c496ad959bde0bab4dd2b7e92757a0bd45fba6fc58d35584a8337d0ad1"
+url = "https://builds.hex.pm/builds/elixir/v1.20.2-otp-28.zip"
+
+[[tools.erlang]]
+version = "28.5.0.4"
+backend = "core:erlang"
+specifiers = ["28.5.0.4"]
+
+[tools.erlang."platforms.macos-arm64"]
+checksum = "sha256:0d02ada35d41afa90ef1f555d18a96acf8a7beb31119270f110d499f0118a79d"
+url = "https://github.com/erlef/otp_builds/releases/download/OTP-28.5.0.4/otp-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/erlef/otp_builds/releases/assets/491495274"
+
+[tools.erlang."platforms.macos-x64"]
+checksum = "sha256:d6ea47803a2b348f686d74ac7d6ed44017a1160e368df8a3084c4c80745ebc3c"
+url = "https://github.com/erlef/otp_builds/releases/download/OTP-28.5.0.4/otp-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/erlef/otp_builds/releases/assets/491499505"
+
+[[tools.erlang]]
+version = "28.5.0.4"
+backend = "core:erlang"
+specifiers = ["28.5.0.4"]
+
+[tools.erlang.options]
+precompiled_os = "ubuntu-22.04"
+
+[tools.erlang."platforms.linux-arm64"]
+checksum = "sha256:6338d3eea959d1eb14f6d2a08ab46e4506ea32290824e5350b6de7a081dba97c"
+url = "https://builds.hex.pm/builds/otp/arm64/ubuntu-22.04/OTP-28.5.0.4.tar.gz"
+
+[tools.erlang."platforms.linux-x64"]
+checksum = "sha256:29df77ddc31722ad07b38722a77ccedeed28f35a160c0c3ad07645989c2272be"
+url = "https://builds.hex.pm/builds/otp/amd64/ubuntu-22.04/OTP-28.5.0.4.tar.gz"
+
 [[tools.node]]
 version = "24.22.2"
 backend = "core:node"
