@@ -14,6 +14,7 @@ defmodule Pinchflat.Metadata.SourceMetadataStorageWorker do
   alias Pinchflat.Sources
   alias Pinchflat.Settings
   alias Pinchflat.Utils.StringUtils
+  alias Pinchflat.Utils.FilesystemUtils
   alias Pinchflat.Metadata.NfoBuilder
   alias Pinchflat.YtDlp.MediaCollection
   alias Pinchflat.YtDlp.ResponseDecoder
@@ -99,17 +100,28 @@ defmodule Pinchflat.Metadata.SourceMetadataStorageWorker do
 
   defp fetch_source_metadata_and_images(series_directory, source) do
     metadata_directory = MetadataFileHelpers.metadata_directory_for(source)
+    # yt-dlp downloads source images into this per-invocation scratch directory.
+    # This worker owns it: it is created here with a random name, the selected
+    # images are copied out to their persistent homes, and the directory itself
+    # is removed once the fetch settles - success, error, or raise. The shared
+    # tmpfile root and anything else under it are never touched.
+    image_directory = Path.join(tmp_directory(), StringUtils.random_string(16))
 
-    with {:ok, metadata} <- maybe_ignore_unavailable_source_metadata(source, fetch_metadata_for_source(source)) do
-      metadata_image_attrs = SourceImageParser.store_source_images(metadata_directory, metadata)
+    try do
+      with {:ok, metadata} <-
+             maybe_ignore_unavailable_source_metadata(source, fetch_metadata_for_source(source, image_directory)) do
+        metadata_image_attrs = SourceImageParser.store_source_images(metadata_directory, metadata)
 
-      if source.media_profile.download_source_images && series_directory do
-        source_image_attrs = SourceImageParser.store_source_images(series_directory, metadata)
+        if source.media_profile.download_source_images && series_directory do
+          source_image_attrs = SourceImageParser.store_source_images(series_directory, metadata)
 
-        {:ok, metadata, source_image_attrs, metadata_image_attrs}
-      else
-        {:ok, metadata, %{}, metadata_image_attrs}
+          {:ok, metadata, source_image_attrs, metadata_image_attrs}
+        else
+          {:ok, metadata, %{}, metadata_image_attrs}
+        end
       end
+    after
+      FilesystemUtils.cleanup_tmpfile_directory(image_directory)
     end
   end
 
@@ -169,8 +181,8 @@ defmodule Pinchflat.Metadata.SourceMetadataStorageWorker do
     end
   end
 
-  defp fetch_metadata_for_source(source) do
-    tmp_output_path = "#{tmp_directory()}/#{StringUtils.random_string(16)}/source_image.%(ext)S"
+  defp fetch_metadata_for_source(source, image_directory) do
+    tmp_output_path = Path.join(image_directory, "source_image.%(ext)S")
     base_opts = [convert_thumbnails: "jpg", output: tmp_output_path]
     should_use_cookies = Sources.use_cookies?(source, :metadata)
 

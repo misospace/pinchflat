@@ -239,6 +239,113 @@ defmodule Pinchflat.Utils.FilesystemUtilsTest do
     end
   end
 
+  describe "cleanup_tmpfile_directory/1" do
+    setup do
+      # These tests assert on directories directly under the root, which only works
+      # if nothing else is living there. DataCase tests are synchronous, so swapping
+      # the root for the duration of the block is safe.
+      original = Application.get_env(:pinchflat, :tmpfile_directory)
+      isolated = Path.join(original, "cleanup-tmpdir-scratch")
+      File.rm_rf!(isolated)
+      File.mkdir_p!(isolated)
+      Application.put_env(:pinchflat, :tmpfile_directory, isolated)
+
+      on_exit(fn ->
+        Application.put_env(:pinchflat, :tmpfile_directory, original)
+        File.rm_rf!(isolated)
+      end)
+
+      :ok
+    end
+
+    test "removes the directory and everything inside it" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      scratch = Path.join(tmpfile_directory, "random16")
+      File.mkdir_p!(Path.join(scratch, "nested"))
+      File.write!(Path.join(scratch, "source_image.jpg"), "image")
+      File.write!(Path.join([scratch, "nested", "unselected.jpg"]), "image")
+      # A sibling of the scratch directory must never be touched
+      sibling = Path.join(tmpfile_directory, "sibling16")
+      File.mkdir_p!(sibling)
+      File.write!(Path.join(sibling, "other_job.json"), "keep me")
+
+      assert :ok = FilesystemUtils.cleanup_tmpfile_directory(scratch)
+
+      refute File.exists?(scratch)
+      assert File.exists?(Path.join(sibling, "other_job.json"))
+      assert File.dir?(tmpfile_directory)
+
+      File.rm_rf!(sibling)
+    end
+
+    test "is idempotent when the directory is already gone" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      scratch = Path.join(tmpfile_directory, "random16")
+
+      # The first pass runs before anything created the directory: a benign
+      # no-op, not a refusal, so it must not log a warning either.
+      refute ExUnit.CaptureLog.capture_log(fn ->
+               assert :ok = FilesystemUtils.cleanup_tmpfile_directory(scratch)
+             end) =~ "Refusing"
+
+      assert :ok = FilesystemUtils.cleanup_tmpfile_directory(scratch)
+
+      assert File.dir?(tmpfile_directory)
+    end
+
+    test "refuses to remove the tmpfile_directory itself" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      survivor = Path.join(tmpfile_directory, "sibling.json")
+      File.write!(survivor, "keep me")
+
+      assert :ok = FilesystemUtils.cleanup_tmpfile_directory(tmpfile_directory)
+
+      assert File.dir?(tmpfile_directory)
+      assert File.read!(survivor) == "keep me"
+    end
+
+    test "refuses to remove a path nested deeper than directly under the tmpfile root" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      nested = Path.join([tmpfile_directory, "deeper", "random16"])
+      File.mkdir_p!(nested)
+      File.write!(Path.join(nested, "keep.json"), "keep me")
+
+      assert :ok = FilesystemUtils.cleanup_tmpfile_directory(nested)
+
+      assert File.read!(Path.join(nested, "keep.json")) == "keep me"
+    end
+
+    test "refuses to remove a path outside the tmpfile root" do
+      outside = Path.join(System.tmp_dir!(), "cleanup-tmpdir-outside")
+      File.rm_rf!(outside)
+      File.mkdir_p!(outside)
+      File.write!(Path.join(outside, "keep.json"), "keep me")
+
+      assert :ok = FilesystemUtils.cleanup_tmpfile_directory(outside)
+
+      assert File.read!(Path.join(outside, "keep.json")) == "keep me"
+
+      File.rm_rf!(outside)
+    end
+
+    test "refuses to delete through a symlinked directory" do
+      tmpfile_directory = Application.get_env(:pinchflat, :tmpfile_directory)
+      escape_target = Path.join(tmpfile_directory, "escape-target")
+      File.mkdir_p!(escape_target)
+      victim = Path.join(escape_target, "keep.json")
+      File.write!(victim, "keep me")
+
+      link = Path.join(tmpfile_directory, "random16")
+      File.ln_s!(escape_target, link)
+
+      assert :ok = FilesystemUtils.cleanup_tmpfile_directory(link)
+
+      assert File.read!(victim) == "keep me"
+
+      File.rm_rf!(escape_target)
+    end
+  end
+
   describe "compute_and_save_media_filesize/1" do
     test "updates the media item with the file size" do
       media_item = media_item_with_attachments()
