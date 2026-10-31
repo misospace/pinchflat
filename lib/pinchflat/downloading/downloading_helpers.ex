@@ -53,14 +53,14 @@ defmodule Pinchflat.Downloading.DownloadingHelpers do
   @doc """
   Takes a single media item and enqueues a download job if the media should be
   downloaded, based on the source's download settings and whether media is
-  considered pending.
+  considered pending. Disabled sources never download media.
 
   Returns {:ok, %Task{}} | {:error, :should_not_download} | {:error, any()}
   """
   def kickoff_download_if_pending(%MediaItem{} = media_item, job_opts \\ []) do
     media_item = Repo.preload(media_item, :source)
 
-    if media_item.source.download_media && Media.pending_download?(media_item) do
+    if media_item.source.enabled && media_item.source.download_media && Media.pending_download?(media_item) do
       Logger.info("Kicking off download for media item ##{media_item.id} (#{media_item.media_id})")
 
       MediaDownloadWorker.kickoff_with_task(media_item, %{}, job_opts)

@@ -109,6 +109,15 @@ defmodule Pinchflat.Downloading.DownloadingHelpersTest do
       refute_enqueued(worker: MediaDownloadWorker)
     end
 
+    test "does not enqueue a download job if the source is disabled" do
+      source = source_fixture(%{enabled: false})
+      media_item = media_item_fixture(source_id: source.id, media_filepath: nil)
+
+      assert {:error, :should_not_download} = DownloadingHelpers.kickoff_download_if_pending(media_item)
+
+      refute_enqueued(worker: MediaDownloadWorker)
+    end
+
     test "does not enqueue a download job if the media item does not match the format rules" do
       profile = media_profile_fixture(%{livestream_behaviour: :exclude})
       source = source_fixture(%{media_profile_id: profile.id})
