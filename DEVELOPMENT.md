@@ -95,10 +95,11 @@ Boundary rules — keep them when editing `.mise/config.toml`:
 - Run the bootstrap from the approved revision: mise trusts the active config
   for `mise run` / `mise install`, so the checkout — not the task — is the
   trust boundary. The bootstrap prints the revision it ran against.
-- The native path pins `TMPDIR`/`TMP`/`TEMP` to `/tmp`: the suite's fixtures
-  hardcode `/tmp/test/...` paths and CI runs with the platform default, so a
-  sandbox that overrides the temp dir would otherwise compile the test config
-  against a different root than the fixtures expect.
+- The native path passes `TMPDIR`/`TMP`/`TEMP` through to the toolchain: the
+  suite derives its fixture paths from the configured directories, so an
+  overridden temp root (automation sandboxes do this) runs against the same
+  roots as CI. Earlier revisions pinned all three to `/tmp` because the
+  fixtures hardcoded `/tmp/test/...` paths; issue #195 removed that.
 - When bootstrap behaviour changes, record a clean-environment receipt —
   revision, command, tool versions, result, limitations — in the PR, and
   re-run setup once more to prove idempotency.

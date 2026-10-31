@@ -33,7 +33,9 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
     test "automatically includes the --print-to-file flag" do
       assert {:ok, output} = Runner.run(@media_url, :foo, [], "%(id)s")
 
-      assert String.contains?(output, "--print-to-file %(id)s /tmp/")
+      tmpfile_directory = Application.fetch_env!(:pinchflat, :tmpfile_directory)
+
+      assert String.contains?(output, "--print-to-file %(id)s #{tmpfile_directory}/")
     end
 
     test "returns the output and status when the command fails" do
@@ -205,7 +207,9 @@ defmodule Pinchflat.YtDlp.CommandRunnerTest do
     test "sets the cache directory" do
       assert {:ok, output} = Runner.run(@media_url, :foo, [], "")
 
-      assert String.contains?(output, "--cache-dir /tmp/test/tmpfiles/yt-dlp-cache")
+      tmpfile_directory = Application.fetch_env!(:pinchflat, :tmpfile_directory)
+
+      assert String.contains?(output, "--cache-dir #{tmpfile_directory}/yt-dlp-cache")
     end
   end
 

@@ -1513,7 +1513,7 @@
       "url": "https://i.ytimg.com/vi_webp/ABC123/maxresdefault.webp",
       "preference": 0,
       "id": "41",
-      "filepath": "/tmp/test/tmpfiles/Pinchflat Example Video-ABC123.webp"
+      "filepath": "{{TMPFILE_DIRECTORY}}/Pinchflat Example Video-ABC123.webp"
     }
   ],
   "thumbnail": "https://i.ytimg.com/vi/ABC123/maxresdefault.jpg",
@@ -9769,7 +9769,7 @@
     "release_git_head": "5498729c59b03a9511c64552da3ba2f802166f8d",
     "repository": "yt-dlp/yt-dlp-nightly-builds"
   },
-  "infojson_filename": "/tmp/test/tmpfiles/Pinchflat Example Video-ABC123.info.json",
+  "infojson_filename": "{{TMPFILE_DIRECTORY}}/Pinchflat Example Video-ABC123.info.json",
   "__infojson_filename": "/app/tmp/videos/ABC123/Pinchflat Example Video-ABC123.info.json",
   "__real_download": true,
   "__files_to_merge": [
