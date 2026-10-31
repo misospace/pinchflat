@@ -12,6 +12,13 @@ defmodule PinchflatWeb.ErrorHTMLTest do
     assert render_to_string(PinchflatWeb.ErrorHTML, "500", "html", []) =~ "Internal Server Error"
   end
 
+  test "500.html links issue reporting to this repository" do
+    html = render_to_string(PinchflatWeb.ErrorHTML, "500", "html", [])
+
+    assert html =~ ~s(href="https://github.com/misospace/pinchflat/issues/new/choose")
+    refute html =~ "CommunityMaintained"
+  end
+
   test "renders a 404 through the standalone error layout", %{conn: conn} do
     # The error-rendering conn never runs the browser pipeline (no flash) and
     # may be handling a database failure, so error pages must not render
