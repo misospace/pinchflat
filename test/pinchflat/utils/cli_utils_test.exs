@@ -38,6 +38,22 @@ defmodule Pinchflat.Utils.CliUtilsTest do
 
       refute log =~ "exited: 1"
     end
+
+    test "scrubs redacted secrets from the argument and result logs" do
+      log =
+        capture_log([level: :debug], fn ->
+          CliUtils.wrap_cmd("echo", ["super-secret-token"], [], redact: ["super-secret-token"])
+        end)
+
+      refute log =~ "super-secret-token"
+      assert log =~ "[redacted]"
+    end
+
+    test "logs arguments unchanged when no redact option is given" do
+      log = capture_log([level: :debug], fn -> CliUtils.wrap_cmd("echo", ["visible-arg"]) end)
+
+      assert log =~ "visible-arg"
+    end
   end
 
   describe "parse_options/1" do

@@ -26,11 +26,20 @@ defmodule Pinchflat.Lifecycle.Notifications.CommandRunner do
     default_opts = [:verbose]
     parsed_opts = CliUtils.parse_options(default_opts ++ command_opts)
 
-    {output, exit_code} = CliUtils.wrap_cmd(backend_executable(), parsed_opts ++ endpoints)
+    {output, exit_code} =
+      CliUtils.wrap_cmd(
+        backend_executable(),
+        parsed_opts ++ endpoints,
+        [],
+        logging_arg_override: "[suppressed]",
+        redact: endpoints
+      )
 
+    # Failed runs have their output logged at ERROR by callers (eg: `SourceNotifications`),
+    # so any echoed endpoints must be scrubbed before they can re-enter the logs
     case exit_code do
       0 -> {:ok, String.trim(output)}
-      _ -> {:error, String.trim(output)}
+      _ -> {:error, output |> CliUtils.redact_text(endpoints) |> String.trim()}
     end
   end
 
