@@ -1,5 +1,82 @@
 # Changelog
 
+## [1.5.0](https://github.com/misospace/pinchflat/compare/v1.4.6...v1.5.0) (2026-10-31)
+
+
+### Features
+
+* **dev:** add reproducible Elixir development bootstrap ([#193](https://github.com/misospace/pinchflat/issues/193)) ([3f68fcd](https://github.com/misospace/pinchflat/commit/3f68fcd2054248479ebb09eaa62fe700b582b9e9))
+* keep media search fast with a weekly FTS5 index optimize ([#179](https://github.com/misospace/pinchflat/issues/179)) ([1fd67a8](https://github.com/misospace/pinchflat/commit/1fd67a800bca7046fd5fcf0438a1bce81a25ef9a))
+* **review:** adopt repository skills and v3.6.0 ([#170](https://github.com/misospace/pinchflat/issues/170)) ([e54c934](https://github.com/misospace/pinchflat/commit/e54c934f5263b5beba23bb3d895c1e593880f4b6))
+
+
+### Bug Fixes
+
+* clean up source thumbnail scratch directories after metadata fetch ([#199](https://github.com/misospace/pinchflat/issues/199)) ([657de24](https://github.com/misospace/pinchflat/commit/657de2471f20b623bb6b000c5b6c084be81ed39d)), closes [#191](https://github.com/misospace/pinchflat/issues/191)
+* fall back to RSS instead of crashing when the YouTube API key list is emptied ([#166](https://github.com/misospace/pinchflat/issues/166)) ([7b86d18](https://github.com/misospace/pinchflat/commit/7b86d186f6e5f92bcfa67458c87a3998d4aa5077))
+* follow HTTP redirects for RSS feeds and GitHub API requests ([#162](https://github.com/misospace/pinchflat/issues/162)) ([b4384b3](https://github.com/misospace/pinchflat/commit/b4384b3446964b00963a0f354ec8ce8634d5a514))
+* keep fast indexing working after shortening the YouTube API key list ([#155](https://github.com/misospace/pinchflat/issues/155)) ([2a6aba9](https://github.com/misospace/pinchflat/commit/2a6aba98e1221406a02a841fefb59379be66be15)), closes [#147](https://github.com/misospace/pinchflat/issues/147)
+* keep media references when a file cannot be deleted ([#149](https://github.com/misospace/pinchflat/issues/149)) ([62a519f](https://github.com/misospace/pinchflat/commit/62a519fd4127109c5c872a6655f5889d6ab4a15d))
+* point error page and Media Profile help links at this repository ([#208](https://github.com/misospace/pinchflat/issues/208)) ([6200a5d](https://github.com/misospace/pinchflat/commit/6200a5d5aa09ee381bcaeba46524d411feb763e1))
+* point sidebar GitHub and release links to misospace/pinchflat ([#187](https://github.com/misospace/pinchflat/issues/187)) ([8beedd3](https://github.com/misospace/pinchflat/commit/8beedd32c25c105f4b33a1c0df9a9fbd85b56726))
+* preserve download retries after partial metadata recovery ([#200](https://github.com/misospace/pinchflat/issues/200)) ([c0ed071](https://github.com/misospace/pinchflat/commit/c0ed071ca4897b297efec77b1d8d8368341c1f89)), closes [#189](https://github.com/misospace/pinchflat/issues/189)
+* preserve yt-dlp policy state when binary updates fail ([#144](https://github.com/misospace/pinchflat/issues/144)) ([e9b39a6](https://github.com/misospace/pinchflat/commit/e9b39a6496c12a362f8f8b3adf77e6551426ed34))
+* redact Apprise endpoint credentials from notification command logs ([#204](https://github.com/misospace/pinchflat/issues/204)) ([e9d929d](https://github.com/misospace/pinchflat/commit/e9d929d4b5252b9cd5cfc43487a3ac71f5c12cf9))
+* reject reversed byte ranges on media streams ([#163](https://github.com/misospace/pinchflat/issues/163)) ([865e3ca](https://github.com/misospace/pinchflat/commit/865e3cade14829bde99cd285fd3f30ef5f2f4703)), closes [#112](https://github.com/misospace/pinchflat/issues/112)
+* return strongest full-text media matches before applying the search limit ([#202](https://github.com/misospace/pinchflat/issues/202)) ([4b2d7b5](https://github.com/misospace/pinchflat/commit/4b2d7b5396a439d24e6137f293371ab85daeb149))
+* **review:** enable specialist Anthropic effort support ([#178](https://github.com/misospace/pinchflat/issues/178)) ([a83a877](https://github.com/misospace/pinchflat/commit/a83a8776a49aa38e2c830b5610eeb59f48b89528))
+* **security:** validate PR-image metadata against trusted GitHub run data ([#142](https://github.com/misospace/pinchflat/issues/142)) ([f15c410](https://github.com/misospace/pinchflat/commit/f15c4101a54f4d378bc514328c138ddcc6699fef)), closes [#139](https://github.com/misospace/pinchflat/issues/139)
+* show strongest per-source table search matches first ([#205](https://github.com/misospace/pinchflat/issues/205)) ([1e0b46a](https://github.com/misospace/pinchflat/commit/1e0b46a3e39dbeaaef88bed63d261f4dd53f3223))
+* stop accumulating yt-dlp metadata tmpfiles and index archives under TMPFILE_PATH ([#158](https://github.com/misospace/pinchflat/issues/158)) ([506c245](https://github.com/misospace/pinchflat/commit/506c24598d2357a883987e294c45af25fa32848f))
+* stop automatic quality upgrades for disabled sources ([#198](https://github.com/misospace/pinchflat/issues/198)) ([8ee30c2](https://github.com/misospace/pinchflat/commit/8ee30c28fc8e281e8667462c3af11d8156cf5d09)), closes [#190](https://github.com/misospace/pinchflat/issues/190)
+* stop leaving orphaned jobs behind when task linkage fails ([#157](https://github.com/misospace/pinchflat/issues/157)) ([ebeda1b](https://github.com/misospace/pinchflat/commit/ebeda1b1908ab739a254ab2ab7dbd7737fd895ea))
+* stop making /usr/local/bin world-writable in the selfhosted image ([#176](https://github.com/misospace/pinchflat/issues/176)) ([5ff912f](https://github.com/misospace/pinchflat/commit/5ff912faaae7a320cda5813f36aa60f5a793dfa6))
+* stop queued downloads from executing after the source is disabled ([#209](https://github.com/misospace/pinchflat/issues/209)) ([017fca8](https://github.com/misospace/pinchflat/commit/017fca846914bf0bd4075222d67f71dab262c1b0)), closes [#197](https://github.com/misospace/pinchflat/issues/197)
+* stop the OPML access key from ever defaulting to "tmp-token" ([#113](https://github.com/misospace/pinchflat/issues/113)) ([d923a8c](https://github.com/misospace/pinchflat/commit/d923a8c9923ff85e9e803ed4f619fcd569295e12))
+* verify SHA-256 checksums for Deno, yt-dlp, and SQLean build artifacts ([#177](https://github.com/misospace/pinchflat/issues/177)) ([4af3720](https://github.com/misospace/pinchflat/commit/4af3720893b109ea5b39cffae7f4ef05476c978f))
+
+
+### Chores
+
+* **ai-review:** upgrade reviewer to v3.2.0 ([#136](https://github.com/misospace/pinchflat/issues/136)) ([d30b713](https://github.com/misospace/pinchflat/commit/d30b713415d9e8391cb55e92b35284d84eb21ba8))
+* **ci:** disable experimental requirement tracing ([#161](https://github.com/misospace/pinchflat/issues/161)) ([6ee3d66](https://github.com/misospace/pinchflat/commit/6ee3d667b8b5358c694835cfa9084978d4556d33))
+* **ci:** enforce a minimum test-coverage threshold in CI ([#181](https://github.com/misospace/pinchflat/issues/181)) ([64a1ff2](https://github.com/misospace/pinchflat/commit/64a1ff262f558d0e7640d9b9a75e16cf3c6f51ae))
+* **ci:** extract trusted PR identity resolution into a tested script ([#164](https://github.com/misospace/pinchflat/issues/164)) ([214e780](https://github.com/misospace/pinchflat/commit/214e7808ae8a7120e089aa8045d0bd1e75cca498))
+* **ci:** format AI review workflow ([#131](https://github.com/misospace/pinchflat/issues/131)) ([5d55c74](https://github.com/misospace/pinchflat/commit/5d55c745acec4df1fcec7acd937f88927d2f9c1a))
+* **ci:** remove stale GHSA-g2wm-735q-3f56 entry from hex audit ignore list ([#182](https://github.com/misospace/pinchflat/issues/182)) ([c885a28](https://github.com/misospace/pinchflat/commit/c885a286ca28b4a3f1f6a092f8eaeab1f5fb9ffa)), closes [#180](https://github.com/misospace/pinchflat/issues/180)
+* **ci:** stop gh rejecting --slurp with --jq in PR image publish ([#146](https://github.com/misospace/pinchflat/issues/146)) ([94a8223](https://github.com/misospace/pinchflat/commit/94a82237df29c5346f31f062d3662f32a46e7ad1))
+* **deps:** bump phoenix_html and ssl_verify_fun to clear hex_audit advisories ([#206](https://github.com/misospace/pinchflat/issues/206)) ([e6325cd](https://github.com/misospace/pinchflat/commit/e6325cde055d284037091fcac9ce68a5ad5ebd6c))
+* **deps:** remove vulnerable hackney dependency ([#133](https://github.com/misospace/pinchflat/issues/133)) ([572664c](https://github.com/misospace/pinchflat/commit/572664cd5c37f584737bf4563de8f44d0578ffb7))
+* **deps:** update dependency alpinejs to v3.17.4 ([#118](https://github.com/misospace/pinchflat/issues/118)) ([0e83b3b](https://github.com/misospace/pinchflat/commit/0e83b3b832ac9fff99d2ad6038d848448220d95c))
+* **deps:** update dependency dns_cluster to v0.3.1 ([#132](https://github.com/misospace/pinchflat/issues/132)) ([30fbeb1](https://github.com/misospace/pinchflat/commit/30fbeb126434e255b88b6bae0e194f1c42b256c3))
+* **deps:** update dependency ecto_sqlite3 to ~&gt; 0.25.0 ([#124](https://github.com/misospace/pinchflat/issues/124)) ([1df7702](https://github.com/misospace/pinchflat/commit/1df7702f3108d2acaa4bfda5753d20e138a1d266))
+* **deps:** update dependency ex_check to ~&gt; 0.17.0 ([#125](https://github.com/misospace/pinchflat/issues/125)) ([b2955c5](https://github.com/misospace/pinchflat/commit/b2955c528310c178f3b303b1a1c484f59bff9d97))
+* **deps:** update dependency finch to ~&gt; 0.24 ([#126](https://github.com/misospace/pinchflat/issues/126)) ([190d384](https://github.com/misospace/pinchflat/commit/190d384b5f0220d585b327a122ec509d2b54ff19))
+* **deps:** update dependency gettext to v1 ([#128](https://github.com/misospace/pinchflat/issues/128)) ([ce2e227](https://github.com/misospace/pinchflat/commit/ce2e227059e9beddbbb2c359eb2a27c386589dc4))
+* **deps:** update dependency oban to v2.24.2 ([#150](https://github.com/misospace/pinchflat/issues/150)) ([3ebfc8a](https://github.com/misospace/pinchflat/commit/3ebfc8a8ba31101b05d9440a674d7e32730a14dc))
+* **deps:** update dependency phoenix to v1.8.15 ([#120](https://github.com/misospace/pinchflat/issues/120)) ([87fee83](https://github.com/misospace/pinchflat/commit/87fee83f3b1faf3c4990093124f0fd5520eb3ee6))
+* **deps:** update dependency phoenix_live_view to v1.2.12 ([#121](https://github.com/misospace/pinchflat/issues/121)) ([ea12d7c](https://github.com/misospace/pinchflat/commit/ea12d7cfbd54e33ffe0eec54751abe9bad4bd9ea))
+* **deps:** update dependency prettier to v3.9.10 ([#151](https://github.com/misospace/pinchflat/issues/151)) ([f05a773](https://github.com/misospace/pinchflat/commit/f05a77318daa036e288887d7dac23eb842b8fdb1))
+* **deps:** update dependency prettier to v3.9.9 ([#122](https://github.com/misospace/pinchflat/issues/122)) ([deb65c9](https://github.com/misospace/pinchflat/commit/deb65c94bf007a093403b741cf0d4eaaa92102a8))
+* **deps:** update dependency sobelow to ~&gt; 0.16 ([#127](https://github.com/misospace/pinchflat/issues/127)) ([a1e1664](https://github.com/misospace/pinchflat/commit/a1e1664ee4728134dd02645c65eeaa4401f51615))
+* **deps:** update dependency swoosh to v1.28.1 ([#123](https://github.com/misospace/pinchflat/issues/123)) ([e088256](https://github.com/misospace/pinchflat/commit/e0882565e65068c396466fab73f9c80c3d6f065e))
+* **deps:** update dependency swoosh to v1.29.0 ([#152](https://github.com/misospace/pinchflat/issues/152)) ([4210231](https://github.com/misospace/pinchflat/commit/4210231e09f859d09fd483ffc33786590db66270))
+* **deps:** update dependency ubuntu to v26 ([#129](https://github.com/misospace/pinchflat/issues/129)) ([a006519](https://github.com/misospace/pinchflat/commit/a006519554399c4677a8c7779da123f7de865e62))
+* **deps:** update github actions ([#117](https://github.com/misospace/pinchflat/issues/117)) ([d9d6ca1](https://github.com/misospace/pinchflat/commit/d9d6ca1aed6857562f6529de5f8204fbaf58a0ca))
+* **deps:** update github actions ([#153](https://github.com/misospace/pinchflat/issues/153)) ([64fd97a](https://github.com/misospace/pinchflat/commit/64fd97a5bdb1cd71456f91ff180298d31ba28e65))
+* **security:** declare websocket protections ([#134](https://github.com/misospace/pinchflat/issues/134)) ([fc851bd](https://github.com/misospace/pinchflat/commit/fc851bdf33403eb7c52f93de4348445c8820f8f5))
+
+
+### Documentation
+
+* clarify route_token is OPML-only and lock the feed auth model ([#148](https://github.com/misospace/pinchflat/issues/148)) ([b086b6a](https://github.com/misospace/pinchflat/commit/b086b6a249999923fdf734595b4f60d439339422))
+
+
+### Refactors
+
+* consolidate duplicated web-layer helpers (#simplify) ([#194](https://github.com/misospace/pinchflat/issues/194)) ([1275ed5](https://github.com/misospace/pinchflat/commit/1275ed5367cbdf69e6d36fc032556c3dae010be8))
+* replace struct-reduce option building with direct conditionals ([#183](https://github.com/misospace/pinchflat/issues/183)) ([4d0b07d](https://github.com/misospace/pinchflat/commit/4d0b07db928491661dcb350d0a3aae02e2d33b23))
+
 ## [1.4.6](https://github.com/misospace/pinchflat/compare/v1.4.5...v1.4.6) (2026-09-17)
 
 
