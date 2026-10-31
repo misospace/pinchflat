@@ -10,6 +10,8 @@ defmodule Pinchflat.SourcesFixtures do
   alias Pinchflat.ProfilesFixtures
   alias Pinchflat.Utils.FilesystemUtils
 
+  import Pinchflat.TestingHelperMethods, only: [render_metadata: 1]
+
   @doc """
   Generate a source.
   """
@@ -60,7 +62,9 @@ defmodule Pinchflat.SourcesFixtures do
     poster_filepath = Path.join(metadata_dir, "poster.jpg")
     fanart_filepath = Path.join(metadata_dir, "fanart.jpg")
 
-    FilesystemUtils.cp_p!(MediaFixtures.media_metadata_filepath_fixture(), json_gz_filepath)
+    # Render rather than copy verbatim so the stored file carries this
+    # environment's paths instead of the fixture's placeholders.
+    FilesystemUtils.write_p!(json_gz_filepath, render_metadata(:media_metadata))
     FilesystemUtils.cp_p!(MediaFixtures.thumbnail_filepath_fixture(), poster_filepath)
     FilesystemUtils.cp_p!(MediaFixtures.thumbnail_filepath_fixture(), fanart_filepath)
 

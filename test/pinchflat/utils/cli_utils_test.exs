@@ -11,7 +11,9 @@ defmodule Pinchflat.Utils.CliUtilsTest do
     end
 
     test "sets the current directory to the tmp dir" do
-      assert {"/tmp/test/tmpfiles\n", 0} = CliUtils.wrap_cmd("pwd", [])
+      tmpfile_directory = Application.fetch_env!(:pinchflat, :tmpfile_directory)
+
+      assert {"#{tmpfile_directory}\n", 0} == CliUtils.wrap_cmd("pwd", [])
     end
   end
 

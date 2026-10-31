@@ -76,17 +76,8 @@ else
   fi
 fi
 
-# The suite's fixtures hardcode /tmp/test/... paths and CI runs with the
-# platform default temp dir. Sandboxes that override TMPDIR/TMP/TEMP
-# (automation workers do) would otherwise compile the test config against a
-# different root than the fixtures expect, so pin the same temp dir CI
-# uses. The suite removes its own scratch dirs on exit.
-if [[ "${TMPDIR:-/tmp}" != "/tmp" ]]; then
-  echo "==> Pinning TMPDIR/TMP/TEMP to /tmp (CI parity: the suite's fixtures hardcode /tmp/test/... paths)"
-fi
-export TMPDIR=/tmp
-export TMP=/tmp
-export TEMP=/tmp
+# TMPDIR/TMP/TEMP pass through unchanged: the suite derives its fixture
+# paths from the configured directories, so it works with any temp root.
 
 # Mirror the Docker wrappers' own flags on the native path: --clean drops the
 # compiled artifacts (the Docker path drops its cached volumes), --shell

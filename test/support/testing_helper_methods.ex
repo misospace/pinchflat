@@ -38,6 +38,11 @@ defmodule Pinchflat.TestingHelperMethods do
     assert after_res == to
   end
 
+  # Placeholder for the configured tmpfile directory inside the JSON fixtures.
+  # The fixtures mirror real yt-dlp output, whose tmp paths are absolute; this
+  # token keeps them honest no matter where TMPDIR points.
+  @tmpfile_directory_placeholder "{{TMPFILE_DIRECTORY}}"
+
   def render_metadata(metadata_name) do
     json_filepath =
       Path.join([
@@ -50,10 +55,16 @@ defmodule Pinchflat.TestingHelperMethods do
 
     # The fixtures mirror real yt-dlp output, which emits ABSOLUTE paths. They were
     # captured on a checkout at /app, so reading them verbatim only works when the
-    # repo happens to live there. Rebase onto the current checkout instead.
+    # repo happens to live there. Rebase onto the current checkout, and swap the
+    # tmpfile-directory placeholder for the configured one (TMPDIR is not always
+    # /tmp).
     json_filepath
     |> File.read!()
     |> String.replace("/app/", File.cwd!() <> "/")
+    |> String.replace(
+      @tmpfile_directory_placeholder,
+      Application.fetch_env!(:pinchflat, :tmpfile_directory)
+    )
   end
 
   def render_parsed_metadata(metadata_name) do

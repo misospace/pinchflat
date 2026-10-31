@@ -216,11 +216,11 @@ invoke_validate check
 expect "native check adds both yarn installs, test-env ecto, then mix check --no-fix --no-retry" \
   'status_is 0 &&
    [[ "$(grep -c "mise exec -- yarn install | .* PWD=$REPO$" "$LOG")" -eq 1 ]] &&
-   log_has "mise exec -- yarn install | TMPDIR=/tmp TMP=/tmp TEMP=/tmp MIX_ENV= PWD=$REPO/assets" &&
+   log_has "mise exec -- yarn install | TMPDIR=/tmp TMP= TEMP= MIX_ENV= PWD=$REPO/assets" &&
    log_order "fetch_sqlean" "mise exec -- mix ecto.create" &&
    log_order "mise exec -- mix ecto.migrate" "mise exec -- mix check" &&
-   log_has "mise exec -- mix ecto.create | TMPDIR=/tmp TMP=/tmp TEMP=/tmp MIX_ENV=test" &&
-   log_has "mise exec -- mix ecto.migrate | TMPDIR=/tmp TMP=/tmp TEMP=/tmp MIX_ENV=test" &&
+   log_has "mise exec -- mix ecto.create | TMPDIR=/tmp TMP= TEMP= MIX_ENV=test" &&
+   log_has "mise exec -- mix ecto.migrate | TMPDIR=/tmp TMP= TEMP= MIX_ENV=test" &&
    log_has "mise exec -- mix check --no-fix --no-retry"'
 
 new_case
@@ -250,10 +250,10 @@ expect "--shell opens the toolchain shell and runs nothing else" \
 new_case
 install_mise_shim
 CASE_TMPDIR="$CASE/sandbox-tmp" invoke_validate test
-expect "TMPDIR/TMP/TEMP are pinned to /tmp for the toolchain (CI parity)" \
-  'status_is 0 && out_has "Pinning TMPDIR" &&
-   ! grep -q "TMPDIR=$CASE/sandbox-tmp" "$LOG" &&
-   log_has "mise exec -- mix test | TMPDIR=/tmp TMP=/tmp TEMP=/tmp"'
+expect "TMPDIR passes through to the toolchain (the suite derives its fixture paths from config)" \
+  'status_is 0 && out_lacks "Pinning TMPDIR" &&
+   log_has "mise exec -- mix test | TMPDIR=$CASE/sandbox-tmp TMP= TEMP=" &&
+   ! grep -q "TMPDIR=/tmp " "$LOG"'
 
 # --- native path: toolchain resolution and failure modes ---------------------------
 

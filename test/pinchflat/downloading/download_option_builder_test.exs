@@ -21,7 +21,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
     test "it generates an expanded output path based on the given template", %{media_item: media_item} do
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
-      assert {:output, "/tmp/test/media/%(title)S.%(ext)s"} in res
+      assert {:output, "#{media_directory()}/%(title)S.%(ext)s"} in res
     end
 
     test "it respects custom output path options", %{media_item: media_item} do
@@ -30,7 +30,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
-      assert {:output, "/tmp/test/media/#{media_item.source.custom_name}.%(ext)s"} in res
+      assert {:output, "#{media_directory()}/#{media_item.source.custom_name}.%(ext)s"} in res
     end
 
     test "respects custom media_item-related output path options", %{media_item: media_item} do
@@ -39,7 +39,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
-      assert {:output, "/tmp/test/media/99.%(ext)s"} in res
+      assert {:output, "#{media_directory()}/99.%(ext)s"} in res
     end
 
     test "uses source's output override if present", %{media_item: media_item} do
@@ -53,7 +53,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
-      assert {:output, "/tmp/test/media/override.%(ext)s"} in res
+      assert {:output, "#{media_directory()}/override.%(ext)s"} in res
     end
   end
 
@@ -171,7 +171,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
-      assert {:output, "thumbnail:/tmp/test/media/%(title)S.%(ext)s"} in res
+      assert {:output, "thumbnail:#{media_directory()}/%(title)S.%(ext)s"} in res
     end
 
     test "matches the thumbnail name to the source's output path override, if present", %{media_item: media_item} do
@@ -185,7 +185,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       assert {:ok, res} = DownloadOptionBuilder.build(media_item)
 
-      assert {:output, "thumbnail:/tmp/test/media/override.%(ext)s"} in res
+      assert {:output, "thumbnail:#{media_directory()}/override.%(ext)s"} in res
     end
 
     test "converts thumbnail to jpg when download_thumbnail is true", %{media_item: media_item} do
@@ -421,13 +421,13 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
     test "builds an output path for a media item", %{media_item: media_item} do
       path = DownloadOptionBuilder.build_output_path_for(media_item)
 
-      assert path == "/tmp/test/media/%(title)S.%(ext)s"
+      assert path == "#{media_directory()}/%(title)S.%(ext)s"
     end
 
     test "builds an output path for a source", %{media_item: media_item} do
       path = DownloadOptionBuilder.build_output_path_for(media_item.source)
 
-      assert path == "/tmp/test/media/%(title)S.%(ext)s"
+      assert path == "#{media_directory()}/%(title)S.%(ext)s"
     end
 
     test "uses source's output override if present", %{media_item: media_item} do
@@ -436,7 +436,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       path = DownloadOptionBuilder.build_output_path_for(source)
 
-      assert path == "/tmp/test/media/override.%(ext)s"
+      assert path == "#{media_directory()}/override.%(ext)s"
     end
 
     test "strips the series_root marker from the output path", %{media_item: media_item} do
@@ -447,7 +447,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       path = DownloadOptionBuilder.build_output_path_for(media_item)
 
-      assert path == "/tmp/test/media/my source/Videos/%(title)S.%(ext)s"
+      assert path == "#{media_directory()}/my source/Videos/%(title)S.%(ext)s"
     end
 
     test "renders the series_root marker with the given override", %{media_item: media_item} do
@@ -458,7 +458,7 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
 
       path = DownloadOptionBuilder.build_output_path_for(media_item, %{"series_root" => "__marker__"})
 
-      assert path == "/tmp/test/media/my source__marker__/Videos/%(title)S.%(ext)s"
+      assert path == "#{media_directory()}/my source__marker__/Videos/%(title)S.%(ext)s"
     end
   end
 
@@ -476,6 +476,10 @@ defmodule Pinchflat.Downloading.DownloadOptionBuilderTest do
       assert {:format_sort, "res:1080,+codec:avc:m4a"} in options
       assert {:remux_video, "mp4"} in options
     end
+  end
+
+  defp media_directory do
+    Application.fetch_env!(:pinchflat, :media_directory)
   end
 
   defp update_media_profile_attribute(media_item_with_preloads, attrs) do

@@ -7,6 +7,8 @@ defmodule Pinchflat.MediaFixtures do
   alias Pinchflat.SourcesFixtures
   alias Pinchflat.Utils.FilesystemUtils
 
+  import Pinchflat.TestingHelperMethods, only: [render_metadata: 1]
+
   @doc """
   Generate a media_item.
   """
@@ -52,7 +54,9 @@ defmodule Pinchflat.MediaFixtures do
     json_gz_filepath = Path.join(metadata_dir, "metadata.json.gz")
     thumbnail_filepath = Path.join(metadata_dir, "thumbnail.jpg")
 
-    FilesystemUtils.cp_p!(media_metadata_filepath_fixture(), json_gz_filepath)
+    # Render the metadata fixture rather than copying it verbatim so the stored
+    # file carries this environment's paths instead of the fixture's placeholders.
+    FilesystemUtils.write_p!(json_gz_filepath, render_metadata(:media_metadata))
     FilesystemUtils.cp_p!(thumbnail_filepath_fixture(), thumbnail_filepath)
 
     merged_attrs =
@@ -144,16 +148,6 @@ defmodule Pinchflat.MediaFixtures do
       "support",
       "files",
       "example.info.json"
-    ])
-  end
-
-  def media_metadata_filepath_fixture do
-    Path.join([
-      File.cwd!(),
-      "test",
-      "support",
-      "files",
-      "media_metadata.json"
     ])
   end
 end
