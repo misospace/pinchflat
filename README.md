@@ -1,17 +1,5 @@
 > [!IMPORTANT]
-> Pinchflat vs. Tubeless.
->
-> Review the options below and carefully choose your own adventure.
->
 > This is a community-maintained fork of [kieraneglin/pinchflat](https://github.com/kieraneglin/pinchflat). The original project is not actively maintained; this fork exists to continue development and apply community contributions. See [Migrating from kieraneglin/pinchflat](#migrating-from-kieraneglinpinchflat). PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Discord Server [created](https://discord.gg/V7grTVkc37)!
-
-<p align="center">
-  <img
-    src="priv/static/images/pinchflat-vs-tubeless.png"
-    alt="Pinchflat Logo by @hernandito"
-    width="700"
-  />
-</p>
 
 <p align="center">
   <img
