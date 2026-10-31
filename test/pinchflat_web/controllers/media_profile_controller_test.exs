@@ -48,6 +48,14 @@ defmodule PinchflatWeb.MediaProfileControllerTest do
 
       refute html_response(conn, 200) =~ "<span>MENU</span>"
     end
+
+    test "links Media Center help to this repository, not to stale forks", %{conn: conn} do
+      conn = get(conn, ~p"/media_profiles/new")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s(href="https://github.com/misospace/pinchflat/issues/new/choose")
+      refute html =~ "CommunityMaintained"
+    end
   end
 
   describe "create media_profile" do
