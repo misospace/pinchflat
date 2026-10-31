@@ -237,6 +237,16 @@ defmodule Pinchflat.Downloading.MediaDownloadWorkerTest do
       perform_job(MediaDownloadWorker, %{id: media_item.id})
     end
 
+    test "does not download if the source was disabled after the job was enqueued", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 0, fn _url, :download, _opts, _ot, _addl -> :ok end)
+
+      Sources.update_source(media_item.source, %{enabled: false})
+
+      perform_job(MediaDownloadWorker, %{id: media_item.id})
+
+      assert Repo.reload(media_item).media_filepath == nil
+    end
+
     test "saves the file's size to the database", %{media_item: media_item} do
       expect(YtDlpRunnerMock, :run, 3, fn
         _url, :get_downloadable_status, _opts, _ot, _addl ->
@@ -402,6 +412,20 @@ defmodule Pinchflat.Downloading.MediaDownloadWorkerTest do
       Media.update_media_item(media_item, %{prevent_download: true})
 
       perform_job(MediaDownloadWorker, %{id: media_item.id, force: true})
+    end
+
+    test "downloads a disabled source's media item if forced", %{media_item: media_item} do
+      expect(YtDlpRunnerMock, :run, 3, fn
+        _url, :get_downloadable_status, _opts, _ot, _addl -> {:ok, "{}"}
+        _url, :download, _opts, _ot, _addl -> {:ok, render_metadata(:media_metadata)}
+        _url, :download_thumbnail, _opts, _ot, _addl -> {:ok, ""}
+      end)
+
+      Sources.update_source(media_item.source, %{enabled: false})
+
+      perform_job(MediaDownloadWorker, %{id: media_item.id, force: true})
+
+      assert Repo.reload(media_item).media_filepath != nil
     end
 
     test "ignores whether the media item is pending when forced", %{media_item: media_item} do

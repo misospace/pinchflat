@@ -72,12 +72,14 @@ defmodule Pinchflat.Downloading.MediaDownloadWorker do
     (source.enabled && source.download_media && !media_item.prevent_download) || should_force
   end
 
-  # If it's not a quality upgrade, additionally check if the media item is pending download
+  # If it's not a quality upgrade, additionally check if the media item is pending download.
+  # The source can be disabled after this job has been enqueued (disabling a source
+  # only cancels tasks for its _pending_ media items), so this is re-checked here.
   defp should_download_media?(media_item, should_force, _is_quality_upgrade) do
     source = media_item.source
     is_pending = Media.pending_download?(media_item)
 
-    (is_pending && source.download_media && !media_item.prevent_download) || should_force
+    (is_pending && source.enabled && source.download_media && !media_item.prevent_download) || should_force
   end
 
   # If a user script exists and, when run, returns a non-zero exit code, prevent this and all future downloads
