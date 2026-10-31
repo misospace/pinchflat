@@ -3,13 +3,6 @@ description: Report a bug
 title: '[Triage] <your title here>'
 labels: ['triage']
 body:
-  - type: markdown
-    attributes:
-      value: '**PLEASE NOTE:**'
-  - type: markdown
-    attributes:
-      value: |
-        Only critical issues will be addressed in this fork. For new features or minor issues, please consider switching to [Tubeless](https://github.com/misospace/tubeless). See [Pinchflat vs. Tubeless](https://github.com/misospace/pinchflat/blob/master/priv/static/images/pinchflat-vs-tubeless.png) for more details.
   - type: textarea
     id: description
     attributes:
@@ -62,9 +55,7 @@ body:
     id: agreements
     attributes:
       label: 'I have verified the following:'
-      description: I have verified that this bug report has not been reported before, and I confirm this is a critical issue that needs to be addressed in this fork.
+      description: I have verified that this bug report has not been reported before.
       options:
         - label: This bug report has not been reported before
-          required: true
-        - label: This is a critical issue that needs to be addressed in this fork.
           required: true
