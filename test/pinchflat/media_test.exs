@@ -581,6 +581,20 @@ defmodule Pinchflat.MediaTest do
       assert [_] = Media.search("dog", limit: 1)
     end
 
+    test "returns the strongest matches before the limit is applied" do
+      %{id: strong_id} = media_item_fixture(%{title: "needle needle needle", description: nil})
+      %{id: weak_id} = media_item_fixture(%{title: "haystack", description: "needle " <> String.duplicate("hay ", 100)})
+
+      assert [%{id: ^strong_id}, %{id: ^weak_id}] = Media.search("needle")
+    end
+
+    test "keeps the strongest match when the limit is applied" do
+      %{id: strong_id} = media_item_fixture(%{title: "needle needle needle", description: nil})
+      media_item_fixture(%{title: "haystack", description: "needle " <> String.duplicate("hay ", 100)})
+
+      assert [%{id: ^strong_id}] = Media.search("needle", limit: 1)
+    end
+
     test "returns an empty list when the search term is blank" do
       assert [] = Media.search("")
     end
