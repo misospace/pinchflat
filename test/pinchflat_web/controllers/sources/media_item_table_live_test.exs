@@ -158,6 +158,26 @@ defmodule PinchflatWeb.Sources.MediaItemTableLiveTest do
 
       assert html =~ other.title
     end
+
+    test "returns strongest matches first when searching", %{conn: conn, source: source} do
+      strong = media_item_fixture(source_id: source.id, media_filepath: nil, title: "needle needle needle")
+
+      weak =
+        media_item_fixture(
+          source_id: source.id,
+          media_filepath: nil,
+          title: "haystack",
+          description: "needle " <> String.duplicate("hay ", 100)
+        )
+
+      {:ok, view, _html} = live_isolated(conn, MediaItemTableLive, session: create_session(source))
+
+      html = render_change(view, "search_term", %{"q" => "needle"})
+
+      assert html =~ strong.title
+      assert html =~ weak.title
+      assert :binary.match(html, strong.title) |> elem(0) < :binary.match(html, weak.title) |> elem(0)
+    end
   end
 
   describe "pagination" do

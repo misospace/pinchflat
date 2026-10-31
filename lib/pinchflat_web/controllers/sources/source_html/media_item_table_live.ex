@@ -170,7 +170,7 @@ defmodule PinchflatWeb.Sources.MediaItemTableLive do
 
     records =
       fetch_records(filtered_base_query, page)
-      |> order_by(desc: fragment("rank"), desc: :uploaded_at)
+      |> order_by(asc: fragment("rank"), desc: :uploaded_at)
       |> Repo.all()
 
     %{
