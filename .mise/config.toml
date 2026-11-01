@@ -66,7 +66,7 @@ erlang = "28.5.0.4"
 # Keep in sync with ELIXIR_VERSION in docker/ci-base.Dockerfile. The
 # "-otp-28" suffix selects the build compiled against OTP 28, matching the
 # ci-base image's hexpm/elixir:1.20.2-erlang-28.5.0.4 base.
-elixir = "1.20.2-otp-28"
+elixir = "1.20.5"
 
 [tasks.bootstrap]
 description = "Idempotent noninteractive dev bootstrap: install the locked toolchain (Node, yarn, OTP, Elixir) and the pinned SQLean extensions, then report versions and executable paths (no deps, no tests, no formatting, no git hooks, no secrets, no database)"
