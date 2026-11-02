@@ -1,3 +1,8 @@
+> [!WARNING]
+> **Pinchflat is deprecated.** This project is no longer maintained and will not receive further feature updates. Development has moved to **[pinchflat-ngx](https://github.com/TheBadFella/pinchflat-ngx)** — please head there for new installations, updates, and future development.
+>
+> If you are currently running Pinchflat, your existing installation will keep working. We recommend migrating to [pinchflat-ngx](https://github.com/TheBadFella/pinchflat-ngx) when you get a chance.
+
 > [!IMPORTANT]
 > This is a community-maintained fork of [kieraneglin/pinchflat](https://github.com/kieraneglin/pinchflat). The original project is not actively maintained; this fork exists to continue development and apply community contributions. See [Migrating from kieraneglin/pinchflat](#migrating-from-kieraneglinpinchflat). PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Discord Server [created](https://discord.gg/V7grTVkc37)!
 
